@@ -14,8 +14,13 @@ import {
   ListItemButton,
   ListItemText,
   Divider,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material'
-import { Add, Dashboard } from '@mui/icons-material'
+import { Add, Dashboard, Delete } from '@mui/icons-material'
 import { useAuthStore } from '../store/useAuthStore'
 import { Tournament } from '../types'
 
@@ -25,6 +30,8 @@ export function HomePage() {
   const [tournamentName, setTournamentName] = useState('')
   const [userName, setUserName] = useState('')
   const [existingTournaments, setExistingTournaments] = useState<Tournament[]>([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null)
 
   useEffect(() => {
     // Load all tournaments from localStorage
@@ -74,6 +81,40 @@ export function HomePage() {
     // Refresh tournaments list
     setExistingTournaments([tournament, ...existingTournaments])
     navigate(`/tournament/${tournamentId}`)
+  }
+
+  const handleDeleteTournament = (tournament: Tournament, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setTournamentToDelete(tournament)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDeleteTournament = () => {
+    if (!tournamentToDelete) return
+
+    // Delete tournament and all related data
+    localStorage.removeItem(`tournament_${tournamentToDelete.id}`)
+    localStorage.removeItem(`tournament_${tournamentToDelete.id}_matches`)
+    localStorage.removeItem(`tournament_${tournamentToDelete.id}_fighters`)
+    
+    // Delete all scorecards for matches in this tournament
+    const savedMatches = localStorage.getItem(`tournament_${tournamentToDelete.id}_matches`)
+    if (savedMatches) {
+      const matches = JSON.parse(savedMatches)
+      matches.forEach((match: any) => {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key?.startsWith(`scorecard_${match.id}_`)) {
+            localStorage.removeItem(key)
+          }
+        }
+      })
+    }
+
+    // Remove from list
+    setExistingTournaments(existingTournaments.filter(t => t.id !== tournamentToDelete.id))
+    setDeleteDialogOpen(false)
+    setTournamentToDelete(null)
   }
 
   const handleJoinAsPublic = () => {
@@ -141,7 +182,19 @@ export function HomePage() {
             <List>
               {existingTournaments.map((tournament, index) => (
                 <Box key={tournament.id}>
-                  <ListItem disablePadding>
+                  <ListItem
+                    disablePadding
+                    secondaryAction={
+                      <IconButton
+                        edge="end"
+                        aria-label="delete"
+                        onClick={(e) => handleDeleteTournament(tournament, e)}
+                        color="error"
+                      >
+                        <Delete />
+                      </IconButton>
+                    }
+                  >
                     <ListItemButton onClick={() => navigate(`/tournament/${tournament.id}`)}>
                       <ListItemText
                         primary={tournament.name}
@@ -178,6 +231,23 @@ export function HomePage() {
           </Stack>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Toernooi Verwijderen</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Weet je zeker dat je "{tournamentToDelete?.name}" wilt verwijderen? 
+            Alle wedstrijden, vechters en scores worden ook verwijderd. Deze actie kan niet ongedaan worden gemaakt.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Annuleren</Button>
+          <Button onClick={confirmDeleteTournament} color="error" variant="contained">
+            Verwijderen
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   )
 }
