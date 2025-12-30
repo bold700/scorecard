@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Container,
@@ -9,15 +9,43 @@ import {
   Card,
   CardContent,
   Stack,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
+  Divider,
 } from '@mui/material'
 import { Add, Dashboard } from '@mui/icons-material'
 import { useAuthStore } from '../store/useAuthStore'
+import { Tournament } from '../types'
 
 export function HomePage() {
   const navigate = useNavigate()
   const { user, setUser } = useAuthStore()
   const [tournamentName, setTournamentName] = useState('')
   const [userName, setUserName] = useState('')
+  const [existingTournaments, setExistingTournaments] = useState<Tournament[]>([])
+
+  useEffect(() => {
+    // Load all tournaments from localStorage
+    const tournaments: Tournament[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith('tournament_') && !key.includes('_matches') && !key.includes('_fighters')) {
+        try {
+          const tournament = JSON.parse(localStorage.getItem(key)!)
+          if (tournament && tournament.id && tournament.name) {
+            tournaments.push(tournament)
+          }
+        } catch (e) {
+          // Skip invalid entries
+        }
+      }
+    }
+    // Sort by creation date (newest first)
+    tournaments.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    setExistingTournaments(tournaments)
+  }, [])
 
   const handleCreateTournament = () => {
     if (!tournamentName.trim() || !userName.trim()) return
@@ -43,6 +71,8 @@ export function HomePage() {
       rounds: 3,
     }
     localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+    // Refresh tournaments list
+    setExistingTournaments([tournament, ...existingTournaments])
     navigate(`/tournament/${tournamentId}`)
   }
 
@@ -102,7 +132,36 @@ export function HomePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      {existingTournaments.length > 0 && (
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Bestaande Toernooien
+            </Typography>
+            <List>
+              {existingTournaments.map((tournament, index) => (
+                <Box key={tournament.id}>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={() => navigate(`/tournament/${tournament.id}`)}>
+                      <ListItemText
+                        primary={tournament.name}
+                        secondary={new Date(tournament.createdAt).toLocaleDateString('nl-NL', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                        })}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                  {index < existingTournaments.length - 1 && <Divider />}
+                </Box>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card sx={{ mt: 3 }}>
         <CardContent>
           <Stack spacing={2}>
             <Typography variant="h6">Of</Typography>
