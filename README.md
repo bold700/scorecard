@@ -56,6 +56,19 @@ Scores worden ingevoerd via grote quick buttons:
 
 Elke actie wordt gelogd als event voor volledige traceerbaarheid.
 
+## GitHub Pages Deployment
+
+De app is geconfigureerd voor automatische deployment naar GitHub Pages via GitHub Actions.
+
+### Setup
+
+1. Ga naar je GitHub repository settings
+2. Navigeer naar "Pages" in het menu
+3. Selecteer "GitHub Actions" als source
+4. Push naar de `main` of `master` branch om automatisch te deployen
+
+De app wordt automatisch gebouwd en gedeployed bij elke push naar de main branch.
+
 ## Status
 
 Dit is een MVP versie. Realtime updates via Firebase en offline sync worden later toegevoegd.
