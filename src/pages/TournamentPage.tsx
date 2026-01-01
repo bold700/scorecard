@@ -22,8 +22,9 @@ import {
   Menu,
 } from '@mui/material'
 import { ExpandMore, ExpandLess, Delete } from '@mui/icons-material'
-import { Add, Dashboard } from '@mui/icons-material'
+import { Add } from '@mui/icons-material'
 import { Match, Scorecard, Fighter } from '../types'
+import { FighterAvatar } from '../components/FighterAvatar'
 
 export function TournamentPage() {
   const { tournamentId } = useParams<{ tournamentId: string }>()
@@ -264,15 +265,6 @@ export function TournamentPage() {
         <Typography variant="h4" component="h1" gutterBottom>
           {tournamentName || 'Toernooi'}
         </Typography>
-        <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-          <Button
-            variant="outlined"
-            startIcon={<Dashboard />}
-            onClick={() => navigate(`/tournament/${tournamentId}/dashboard`)}
-          >
-            Dashboard
-          </Button>
-        </Stack>
       </Box>
 
 
@@ -321,7 +313,7 @@ export function TournamentPage() {
                           <Box
                             sx={{
                               display: 'flex',
-                              alignItems: 'flex-start',
+                              alignItems: 'center',
                               justifyContent: 'space-between',
                               px: 2,
                               py: 3,
@@ -330,19 +322,7 @@ export function TournamentPage() {
                           >
                             {/* ROOD */}
                             <Box sx={{ flex: 1, textAlign: 'center' }}>
-                              <Typography
-                                variant="overline"
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  color: 'error.main',
-                                  display: 'block',
-                                  mb: 0.5,
-                                }}
-                              >
-                                ROOD
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5, mb: 2 }}>
                                 <Typography
                                   variant="h3"
                                   sx={{
@@ -366,28 +346,32 @@ export function TournamentPage() {
                                   /{maxPossibleScore}
                                 </Typography>
                               </Box>
-                              <Typography
-                                variant="body1"
-                                sx={{
-                                  color: 'text.primary',
-                                  fontSize: '1rem',
-                                  mb: winner === 'red' ? 0.5 : 0,
-                                }}
-                              >
-                                {match.redFighter}
-                              </Typography>
-                              {winner === 'red' && (
-                                <Chip
-                                  label="Winnaar"
-                                  color="success"
-                                  size="small"
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
+                                <FighterAvatar name={match.redFighter} size={28} color="red" />
+                                <Typography
+                                  variant="h6"
                                   sx={{
-                                    mt: 0.5,
-                                    fontSize: '0.7rem',
-                                    height: '20px',
+                                    color: 'text.primary',
+                                    fontSize: '1.25rem',
+                                    fontWeight: 600,
                                   }}
-                                />
-                              )}
+                                >
+                                  {match.redFighter}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ minHeight: '28px', display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 0.5 }}>
+                                {winner === 'red' && (
+                                  <Chip
+                                    label="Winnaar"
+                                    color="success"
+                                    size="small"
+                                    sx={{
+                                      fontSize: '0.7rem',
+                                      height: '20px',
+                                    }}
+                                  />
+                                )}
+                              </Box>
                             </Box>
 
                             {/* VS - Aligned with scores */}
@@ -395,8 +379,9 @@ export function TournamentPage() {
                               sx={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                height: '2.5rem',
+                                justifyContent: 'center',
                                 mx: 2,
+                                alignSelf: 'center',
                               }}
                             >
                               <Typography
@@ -412,19 +397,7 @@ export function TournamentPage() {
 
                             {/* BLAUW */}
                             <Box sx={{ flex: 1, textAlign: 'center' }}>
-                              <Typography
-                                variant="overline"
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  color: 'info.main',
-                                  display: 'block',
-                                  mb: 0.5,
-                                }}
-                              >
-                                BLAUW
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5, mb: 2 }}>
                                 <Typography
                                   variant="h3"
                                   sx={{
@@ -448,28 +421,32 @@ export function TournamentPage() {
                                   /{maxPossibleScore}
                                 </Typography>
                               </Box>
-                              <Typography
-                                variant="body1"
-                                sx={{
-                                  color: 'text.primary',
-                                  fontSize: '1rem',
-                                  mb: winner === 'blue' ? 0.5 : 0,
-                                }}
-                              >
-                                {match.blueFighter}
-                              </Typography>
-                              {winner === 'blue' && (
-                                <Chip
-                                  label="Winnaar"
-                                  color="success"
-                                  size="small"
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
+                                <FighterAvatar name={match.blueFighter} size={28} color="blue" />
+                                <Typography
+                                  variant="h6"
                                   sx={{
-                                    mt: 0.5,
-                                    fontSize: '0.7rem',
-                                    height: '20px',
+                                    color: 'text.primary',
+                                    fontSize: '1.25rem',
+                                    fontWeight: 600,
                                   }}
-                                />
-                              )}
+                                >
+                                  {match.blueFighter}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ minHeight: '28px', display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 0.5 }}>
+                                {winner === 'blue' && (
+                                  <Chip
+                                    label="Winnaar"
+                                    color="success"
+                                    size="small"
+                                    sx={{
+                                      fontSize: '0.7rem',
+                                      height: '20px',
+                                    }}
+                                  />
+                                )}
+                              </Box>
                             </Box>
                           </Box>
 
@@ -591,7 +568,7 @@ export function TournamentPage() {
                           <Box
                             sx={{
                               display: 'flex',
-                              alignItems: 'flex-start',
+                              alignItems: 'center',
                               justifyContent: 'space-between',
                               px: 2,
                               py: 3,
@@ -600,19 +577,7 @@ export function TournamentPage() {
                           >
                             {/* ROOD */}
                             <Box sx={{ flex: 1, textAlign: 'center' }}>
-                              <Typography
-                                variant="overline"
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  color: 'error.main',
-                                  display: 'block',
-                                  mb: 0.5,
-                                }}
-                              >
-                                ROOD
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5, mb: 2 }}>
                                 <Typography
                                   variant="h3"
                                   sx={{
@@ -636,15 +601,19 @@ export function TournamentPage() {
                                   /{maxPossibleScore}
                                 </Typography>
                               </Box>
-                              <Typography
-                                variant="body1"
-                                sx={{
-                                  color: 'text.primary',
-                                  fontSize: '1rem',
-                                }}
-                              >
-                                {match.redFighter}
-                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
+                                <FighterAvatar name={match.redFighter} size={28} color="red" />
+                                <Typography
+                                  variant="h6"
+                                  sx={{
+                                    color: 'text.primary',
+                                    fontSize: '1.25rem',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {match.redFighter}
+                                </Typography>
+                              </Box>
                             </Box>
 
                             {/* VS */}
@@ -652,8 +621,9 @@ export function TournamentPage() {
                               sx={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                height: '2.5rem',
+                                justifyContent: 'center',
                                 mx: 2,
+                                alignSelf: 'center',
                               }}
                             >
                               <Typography
@@ -669,19 +639,7 @@ export function TournamentPage() {
 
                             {/* BLAUW */}
                             <Box sx={{ flex: 1, textAlign: 'center' }}>
-                              <Typography
-                                variant="overline"
-                                sx={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  color: 'info.main',
-                                  display: 'block',
-                                  mb: 0.5,
-                                }}
-                              >
-                                BLAUW
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.5, mb: 2 }}>
                                 <Typography
                                   variant="h3"
                                   sx={{
@@ -705,15 +663,19 @@ export function TournamentPage() {
                                   /{maxPossibleScore}
                                 </Typography>
                               </Box>
-                              <Typography
-                                variant="body1"
-                                sx={{
-                                  color: 'text.primary',
-                                  fontSize: '1rem',
-                                }}
-                              >
-                                {match.blueFighter}
-                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75 }}>
+                                <FighterAvatar name={match.blueFighter} size={28} color="blue" />
+                                <Typography
+                                  variant="h6"
+                                  sx={{
+                                    color: 'text.primary',
+                                    fontSize: '1.25rem',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {match.blueFighter}
+                                </Typography>
+                              </Box>
                             </Box>
                           </Box>
                         </Box>
@@ -725,43 +687,6 @@ export function TournamentPage() {
           </Stack>
         )}
       </Box>
-
-      {/* FAB voor wedstrijden toevoegen */}
-      <Fab
-        color="primary"
-        aria-label="add match"
-        sx={{ position: 'fixed', bottom: 24, right: 24 }}
-        onClick={(e) => setFabMenuAnchor(e.currentTarget)}
-      >
-        <Add />
-      </Fab>
-
-      {/* Menu voor FAB */}
-      <Menu
-        anchorEl={fabMenuAnchor}
-        open={Boolean(fabMenuAnchor)}
-        onClose={() => setFabMenuAnchor(null)}
-      >
-        <MenuItem
-          onClick={() => {
-            setManualMatch({ redFighter: '', blueFighter: '', rounds: tournamentRounds })
-            setOpenMatchDialog(true)
-            setFabMenuAnchor(null)
-          }}
-        >
-          Handmatig wedstrijd toevoegen
-        </MenuItem>
-        {fighters.length >= 2 && (
-          <MenuItem
-            onClick={() => {
-              handleGenerateMatches()
-              setFabMenuAnchor(null)
-            }}
-          >
-            Genereer alle wedstrijden
-          </MenuItem>
-        )}
-      </Menu>
 
       {/* Handmatig Wedstrijd Dialog */}
       <Dialog open={openMatchDialog} onClose={() => setOpenMatchDialog(false)} maxWidth="sm" fullWidth>
@@ -819,7 +744,7 @@ export function TournamentPage() {
       <Fab
         color="primary"
         aria-label="add match"
-        sx={{ position: 'fixed', bottom: 24, right: 24 }}
+        sx={{ position: 'fixed', bottom: 80, right: 16, zIndex: 1000 }}
         onClick={(e) => setFabMenuAnchor(e.currentTarget)}
       >
         <Add />

@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { AppBar, Toolbar, IconButton, Typography, Box } from '@mui/material'
-import { ArrowBack, Home } from '@mui/icons-material'
+import { AppBar, Toolbar, IconButton, Box } from '@mui/material'
+import { ArrowBack } from '@mui/icons-material'
 
 export function Navigation() {
   const navigate = useNavigate()
@@ -21,17 +21,7 @@ export function Navigation() {
             <ArrowBack />
           </IconButton>
         )}
-        <IconButton
-          edge="start"
-          color="inherit"
-          onClick={() => navigate('/')}
-          sx={{ mr: 1 }}
-        >
-          <Home />
-        </IconButton>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          Scorecard
-        </Typography>
+        <Box sx={{ flexGrow: 1 }} />
       </Toolbar>
     </AppBar>
   )

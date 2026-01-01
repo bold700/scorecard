@@ -9,31 +9,34 @@ import {
   Card,
   CardContent,
   Stack,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  Divider,
   IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
 } from '@mui/material'
-import { Add, Dashboard, Delete } from '@mui/icons-material'
+import { Delete } from '@mui/icons-material'
 import { useAuthStore } from '../store/useAuthStore'
 import { Tournament } from '../types'
 
-export function HomePage() {
+interface HomePageProps {
+  createDialogOpen: boolean
+  setCreateDialogOpen: (open: boolean) => void
+}
+
+export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProps) {
   const navigate = useNavigate()
   const { user, setUser } = useAuthStore()
-  const [tournamentName, setTournamentName] = useState('')
-  const [userName, setUserName] = useState('')
   const [existingTournaments, setExistingTournaments] = useState<Tournament[]>([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null)
+  const [tournamentName, setTournamentName] = useState('')
 
   useEffect(() => {
+    loadTournaments()
+  }, [])
+
+  const loadTournaments = () => {
     // Load all tournaments from localStorage
     const tournaments: Tournament[] = []
     for (let i = 0; i < localStorage.length; i++) {
@@ -52,18 +55,10 @@ export function HomePage() {
     // Sort by creation date (newest first)
     tournaments.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     setExistingTournaments(tournaments)
-  }, [])
+  }
 
   const handleCreateTournament = () => {
-    if (!tournamentName.trim() || !userName.trim()) return
-
-    // Create user
-    const newUser: typeof user = {
-      id: `user_${Date.now()}`,
-      name: userName,
-      role: 'organizer',
-    }
-    setUser(newUser)
+    if (!tournamentName.trim()) return
 
     // Create tournament (in real app, this would be saved to Firebase)
     const tournamentId = `tournament_${Date.now()}`
@@ -72,14 +67,19 @@ export function HomePage() {
       id: tournamentId,
       name: tournamentName,
       createdAt: Date.now(),
-      createdBy: newUser.id,
+      createdBy: user?.id || 'anonymous',
       fighters: [],
       matches: [],
       rounds: 3,
     }
     localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+    
+    // Reset form
+    setTournamentName('')
+    setCreateDialogOpen(false)
+    
     // Refresh tournaments list
-    setExistingTournaments([tournament, ...existingTournaments])
+    loadTournaments()
     navigate(`/tournament/${tournamentId}`)
   }
 
@@ -112,125 +112,104 @@ export function HomePage() {
     }
 
     // Remove from list
-    setExistingTournaments(existingTournaments.filter(t => t.id !== tournamentToDelete.id))
+    loadTournaments()
     setDeleteDialogOpen(false)
     setTournamentToDelete(null)
   }
 
-  const handleJoinAsPublic = () => {
-    if (!userName.trim()) return
-
-    const newUser: typeof user = {
-      id: `user_${Date.now()}`,
-      name: userName,
-      role: 'public_user',
-    }
-    setUser(newUser)
-  }
-
   return (
     <Container maxWidth="sm" sx={{ py: 4 }}>
-      <Box sx={{ textAlign: 'center', mb: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Scorecard
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Toernooien
         </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Digitale scorecard voor vechtsportwedstrijden
+        <Typography variant="body2" color="text.secondary">
+          Overzicht van alle toernooien
         </Typography>
       </Box>
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Stack spacing={3}>
-            <TextField
-              label="Jouw naam"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              fullWidth
-              required
-            />
+      {existingTournaments.length > 0 ? (
+        <Stack spacing={2}>
+          {existingTournaments.map((tournament) => (
+            <Card 
+              key={tournament.id}
+              sx={{ cursor: 'pointer' }}
+              onClick={() => navigate(`/tournament/${tournament.id}`)}
+            >
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="h6" component="div" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      {tournament.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {new Date(tournament.createdAt).toLocaleDateString('nl-NL', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    edge="end"
+                    aria-label="delete"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteTournament(tournament, e)
+                    }}
+                    color="error"
+                    sx={{ ml: 1 }}
+                  >
+                    <Delete />
+                  </IconButton>
+                </Box>
+              </CardContent>
+            </Card>
+          ))}
+        </Stack>
+      ) : (
+        <Card>
+          <CardContent>
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography variant="body1" color="text.secondary">
+                Nog geen toernooien. Maak er een aan met de knop hieronder.
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
+      {/* Create Tournament Dialog */}
+      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Nieuw Toernooi Aanmaken</DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 1 }}>
             <TextField
               label="Toernooi naam"
               value={tournamentName}
               onChange={(e) => setTournamentName(e.target.value)}
               fullWidth
               required
-              disabled={!userName.trim()}
+              autoFocus
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && tournamentName.trim()) {
+                  handleCreateTournament()
+                }
+              }}
             />
-
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={<Add />}
-              onClick={handleCreateTournament}
-              disabled={!tournamentName.trim() || !userName.trim()}
-              fullWidth
-            >
-              Toernooi Aanmaken
-            </Button>
           </Stack>
-        </CardContent>
-      </Card>
-
-      {existingTournaments.length > 0 && (
-        <Card sx={{ mt: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Bestaande Toernooien
-            </Typography>
-            <List>
-              {existingTournaments.map((tournament, index) => (
-                <Box key={tournament.id}>
-                  <ListItem
-                    disablePadding
-                    secondaryAction={
-                      <IconButton
-                        edge="end"
-                        aria-label="delete"
-                        onClick={(e) => handleDeleteTournament(tournament, e)}
-                        color="error"
-                      >
-                        <Delete />
-                      </IconButton>
-                    }
-                  >
-                    <ListItemButton onClick={() => navigate(`/tournament/${tournament.id}`)}>
-                      <ListItemText
-                        primary={tournament.name}
-                        secondary={new Date(tournament.createdAt).toLocaleDateString('nl-NL', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                  {index < existingTournaments.length - 1 && <Divider />}
-                </Box>
-              ))}
-            </List>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card sx={{ mt: 3 }}>
-        <CardContent>
-          <Stack spacing={2}>
-            <Typography variant="h6">Of</Typography>
-            <Button
-              variant="outlined"
-              size="large"
-              startIcon={<Dashboard />}
-              onClick={handleJoinAsPublic}
-              disabled={!userName.trim()}
-              fullWidth
-            >
-              Meedoen als Publiek
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateDialogOpen(false)}>Annuleren</Button>
+          <Button
+            onClick={handleCreateTournament}
+            disabled={!tournamentName.trim()}
+            variant="contained"
+          >
+            Aanmaken
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
@@ -248,6 +227,7 @@ export function HomePage() {
           </Button>
         </DialogActions>
       </Dialog>
+
     </Container>
   )
 }

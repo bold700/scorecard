@@ -19,6 +19,7 @@ import {
 import { CheckCircle, ArrowBack, ArrowForward, Delete } from '@mui/icons-material'
 import { Scorecard, ScoreEvent, Match, RoundScore } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
+import { FighterAvatar } from '../components/FighterAvatar'
 
 export function ScorecardPage() {
   const { tournamentId, matchId, userId } = useParams<{
@@ -332,50 +333,30 @@ export function ScorecardPage() {
         {/* ROOD */}
         <Box sx={{ flex: 1, textAlign: 'center' }}>
           <Typography
-            variant="overline"
-            sx={{
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: 'error.main',
-              display: 'block',
-              mb: 1,
-            }}
-          >
-            ROOD
-          </Typography>
-          <Typography
             variant="h1"
             sx={{
               fontSize: '4rem',
               fontWeight: 700,
               color: 'error.main',
               lineHeight: 1,
-              mb: 1,
+              mb: 2,
             }}
           >
             {currentRoundData.redTotal}
           </Typography>
-          <Typography
-            variant="body1"
-            sx={{
-              color: 'text.primary',
-              fontSize: '1rem',
-              mb: 0.5,
-            }}
-          >
-            {match.redFighter}
-          </Typography>
-          {/* Eindstand */}
-          <Typography
-            variant="caption"
-            sx={{
-              color: 'text.secondary',
-              fontSize: '0.75rem',
-              display: 'block',
-            }}
-          >
-            Totaal: {scorecard.totalRed}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+            <FighterAvatar name={match.redFighter} size={32} color="red" />
+            <Typography
+              variant="h5"
+              sx={{
+                color: 'text.primary',
+                fontSize: '1.5rem',
+                fontWeight: 600,
+              }}
+            >
+              {match.redFighter}
+            </Typography>
+          </Box>
         </Box>
 
         {/* VS */}
@@ -393,50 +374,30 @@ export function ScorecardPage() {
         {/* BLAUW */}
         <Box sx={{ flex: 1, textAlign: 'center' }}>
           <Typography
-            variant="overline"
-            sx={{
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: 'info.main',
-              display: 'block',
-              mb: 1,
-            }}
-          >
-            BLAUW
-          </Typography>
-          <Typography
             variant="h1"
             sx={{
               fontSize: '4rem',
               fontWeight: 700,
               color: 'info.main',
               lineHeight: 1,
-              mb: 1,
+              mb: 2,
             }}
           >
             {currentRoundData.blueTotal}
           </Typography>
-          <Typography
-            variant="body1"
-            sx={{
-              color: 'text.primary',
-              fontSize: '1rem',
-              mb: 0.5,
-            }}
-          >
-            {match.blueFighter}
-          </Typography>
-          {/* Eindstand */}
-          <Typography
-            variant="caption"
-            sx={{
-              color: 'text.secondary',
-              fontSize: '0.75rem',
-              display: 'block',
-            }}
-          >
-            Totaal: {scorecard.totalBlue}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+            <FighterAvatar name={match.blueFighter} size={32} color="blue" />
+            <Typography
+              variant="h5"
+              sx={{
+                color: 'text.primary',
+                fontSize: '1.5rem',
+                fontWeight: 600,
+              }}
+            >
+              {match.blueFighter}
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
