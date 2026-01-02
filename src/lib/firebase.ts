@@ -25,9 +25,12 @@ if (firebaseConfig.apiKey !== 'demo' && firebaseConfig.projectId !== 'demo') {
     db = getFirestore(app)
     auth = getAuth(app)
     isFirebaseConfigured = true
+    console.log('Firebase initialized successfully', { projectId: firebaseConfig.projectId })
   } catch (error) {
-    console.warn('Firebase initialization failed:', error)
+    console.error('Firebase initialization failed:', error)
   }
+} else {
+  console.warn('Firebase not configured - using demo values. API Key:', firebaseConfig.apiKey, 'Project ID:', firebaseConfig.projectId)
 }
 
 // Helper om te checken of Firebase beschikbaar is
@@ -43,16 +46,19 @@ export const firebaseService = {
     )
     
     if (!isFirebaseAvailable()) {
+      console.warn('Firebase not available, saving to localStorage only')
       // Fallback naar localStorage
       localStorage.setItem(`tournament_${tournament.id}`, JSON.stringify(tournament))
       return
     }
     
     try {
+      console.log('Saving tournament to Firebase:', tournament.id)
       const tournamentRef = doc(db, 'tournaments', tournament.id)
       await setDoc(tournamentRef, cleanTournament)
+      console.log('Tournament saved successfully to Firebase')
     } catch (error) {
-      console.error('Error saving tournament:', error)
+      console.error('Error saving tournament to Firebase:', error)
       // Fallback naar localStorage
       localStorage.setItem(`tournament_${tournament.id}`, JSON.stringify(tournament))
     }
