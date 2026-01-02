@@ -31,7 +31,6 @@ export function TournamentPage() {
   const [tournamentName, setTournamentName] = useState<string>('')
   const [tournamentRounds, setTournamentRounds] = useState<number>(3)
   const [fighters, setFighters] = useState<Fighter[]>([])
-  const [newFighterName, setNewFighterName] = useState('')
   const [matches, setMatches] = useState<Match[]>([])
   const [matchScorecards, setMatchScorecards] = useState<Record<string, Scorecard[]>>({})
   const [expandedMatches, setExpandedMatches] = useState<Record<string, boolean>>({})
