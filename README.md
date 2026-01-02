@@ -112,6 +112,26 @@ Om toernooien gedeeld te maken zodat andere gebruikers ze kunnen zien:
 
 **Belangrijk:** Zonder Firebase configuratie werkt de app nog steeds, maar gebruikt dan alleen localStorage (lokaal). Met Firebase worden toernooien gedeeld tussen alle gebruikers.
 
+### GitHub Pages Deployment
+
+Voor GitHub Pages deployment moet je ook GitHub Secrets toevoegen:
+
+1. **Ga naar je GitHub repository:**
+   - Klik op "Settings" > "Secrets and variables" > "Actions"
+   - Klik op "New repository secret"
+
+2. **Voeg de volgende secrets toe:**
+   - `VITE_FIREBASE_API_KEY` - Je Firebase API key
+   - `VITE_FIREBASE_AUTH_DOMAIN` - Je Firebase auth domain
+   - `VITE_FIREBASE_PROJECT_ID` - Je Firebase project ID
+   - `VITE_FIREBASE_STORAGE_BUCKET` - Je Firebase storage bucket
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID` - Je Firebase messaging sender ID
+   - `VITE_FIREBASE_APP_ID` - Je Firebase app ID
+
+3. **Na het toevoegen van de secrets:**
+   - Push een nieuwe commit naar de main branch
+   - De GitHub Actions workflow zal automatisch de build uitvoeren met de Firebase credentials
+
 ## Status
 
 De app ondersteunt nu Firebase Firestore voor gedeelde toernooien. Zonder Firebase configuratie valt de app terug op localStorage voor lokale opslag.
