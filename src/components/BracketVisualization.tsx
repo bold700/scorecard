@@ -49,15 +49,17 @@ export function BracketVisualization({ matches, matchScorecards, tournamentId }:
     // Process each phase
     phases.forEach(phase => {
       const phaseMatches = matchesByPhase[phase]
-      phaseMatches.forEach(match => {
-        const scorecards = matchScorecards[match.id] || []
-        const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
-        bracket[phase].push({
-          match,
-          scorecard: officialScorecard,
-          winner: getMatchWinner(match),
+      if (phaseMatches) {
+        phaseMatches.forEach(match => {
+          const scorecards = matchScorecards[match.id] || []
+          const aggregatedScorecard = createAggregatedScorecard(match.id, scorecards) || scorecards[0]
+          bracket[phase].push({
+            match,
+            scorecard: aggregatedScorecard,
+            winner: getMatchWinner(match),
+          })
         })
-      })
+      }
     })
 
     return bracket
