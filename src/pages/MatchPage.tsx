@@ -15,7 +15,7 @@ import {
   ListItemButton,
 } from '@mui/material'
 import { PersonAdd } from '@mui/icons-material'
-import { Match } from '../types'
+import { Match, User } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 
 export function MatchPage() {
@@ -50,12 +50,15 @@ export function MatchPage() {
       } else {
         // Create a new user ID
         userId = `user_${Date.now()}`
-        const newUser = {
+        const newUser: User = {
           id: userId,
           name: 'Publiek',
-          role: 'public',
+          role: 'public_user',
         }
         localStorage.setItem('auth_user', JSON.stringify(newUser))
+        // Also update the store
+        const { setUser } = useAuthStore.getState()
+        setUser(newUser)
       }
     }
     
