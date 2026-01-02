@@ -37,8 +37,29 @@ export function MatchPage() {
   }, [tournamentId, matchId])
 
   const handleJoinAsJudge = () => {
-    if (!match || !user) return
-    navigate(`/tournament/${tournamentId}/match/${matchId}/scorecard/${user.id}`)
+    if (!match) return
+    
+    // Get or create user
+    let userId = user?.id
+    if (!userId) {
+      // Check if user exists in localStorage
+      const savedUser = localStorage.getItem('auth_user')
+      if (savedUser) {
+        const parsedUser = JSON.parse(savedUser)
+        userId = parsedUser.id
+      } else {
+        // Create a new user ID
+        userId = `user_${Date.now()}`
+        const newUser = {
+          id: userId,
+          name: 'Publiek',
+          role: 'public',
+        }
+        localStorage.setItem('auth_user', JSON.stringify(newUser))
+      }
+    }
+    
+    navigate(`/tournament/${tournamentId}/match/${matchId}/scorecard/${userId}`)
   }
 
   if (!match) {
