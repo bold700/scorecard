@@ -19,12 +19,12 @@ interface BracketMatch {
 export function BracketVisualization({ matches, matchScorecards, tournamentId }: BracketVisualizationProps) {
   const navigate = useNavigate()
 
-  // Group matches by phase
+  // Group matches by phase (exclude poule as it's not part of knockout bracket)
   const phases: TournamentPhase[] = ['kwartfinale', 'halve_finale', 'finale', 'bronzen_finale']
-  const matchesByPhase = phases.reduce((acc, phase) => {
-    acc[phase] = matches.filter(m => m.phase === phase)
-    return acc
-  }, {} as Record<TournamentPhase, Match[]>)
+  const matchesByPhase: Partial<Record<TournamentPhase, Match[]>> = {}
+  phases.forEach(phase => {
+    matchesByPhase[phase] = matches.filter(m => m.phase === phase)
+  })
 
   // Get winner for a match using aggregated scorecard
   const getMatchWinner = (match: Match): string | undefined => {
@@ -39,6 +39,7 @@ export function BracketVisualization({ matches, matchScorecards, tournamentId }:
   // Build bracket structure
   const buildBracket = () => {
     const bracket: Record<TournamentPhase, BracketMatch[]> = {
+      poule: [],
       kwartfinale: [],
       halve_finale: [],
       finale: [],
@@ -72,6 +73,7 @@ export function BracketVisualization({ matches, matchScorecards, tournamentId }:
 
   const getPhaseLabel = (phase: TournamentPhase): string => {
     const labels: Record<TournamentPhase, string> = {
+      poule: 'Poule',
       kwartfinale: 'Kwartfinales',
       halve_finale: 'Halve Finales',
       finale: 'Finale',

@@ -37,8 +37,6 @@ interface FighterStats {
 export function DashboardPage() {
   const { tournamentId } = useParams<{ tournamentId: string }>()
   const [tournamentName, setTournamentName] = useState<string>('')
-  const [tournamentType, setTournamentType] = useState<string>('round-robin')
-  const [currentPhase, setCurrentPhase] = useState<string>('poule')
   const [matches, setMatches] = useState<Match[]>([])
   const [fighters, setFighters] = useState<Fighter[]>([])
   const [matchScorecards, setMatchScorecards] = useState<Record<string, Scorecard[]>>({})
@@ -58,8 +56,6 @@ export function DashboardPage() {
       const tournament = await firebaseService.getTournament(tournamentId!)
       if (tournament) {
         setTournamentName(tournament.name || 'Toernooi')
-        setTournamentType(tournament.type || 'round-robin')
-        setCurrentPhase(tournament.currentPhase || 'poule')
       }
       
       // Load fighters from Firebase (with localStorage fallback)
