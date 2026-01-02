@@ -7,7 +7,6 @@ import {
   Stack,
   Card,
   CardContent,
-  IconButton,
 } from '@mui/material'
 import { Tournament } from '../types'
 

@@ -26,7 +26,7 @@ interface HomePageProps {
 
 export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProps) {
   const navigate = useNavigate()
-  const { user, setUser } = useAuthStore()
+  const { user } = useAuthStore()
   const [existingTournaments, setExistingTournaments] = useState<Tournament[]>([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null)
@@ -118,7 +118,7 @@ export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProp
   }
 
   return (
-    <Container maxWidth="sm" sx={{ py: 4 }}>
+    <Container maxWidth="md" sx={{ py: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Toernooien

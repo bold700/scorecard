@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Container,
@@ -17,7 +17,6 @@ import {
   Grid,
   Chip,
   Collapse,
-  IconButton,
   Fab,
   Menu,
 } from '@mui/material'
@@ -33,7 +32,6 @@ export function TournamentPage() {
   const [tournamentRounds, setTournamentRounds] = useState<number>(3)
   const [fighters, setFighters] = useState<Fighter[]>([])
   const [newFighterName, setNewFighterName] = useState('')
-  const fighterInputRef = useRef<HTMLInputElement>(null)
   const [matches, setMatches] = useState<Match[]>([])
   const [matchScorecards, setMatchScorecards] = useState<Record<string, Scorecard[]>>({})
   const [expandedMatches, setExpandedMatches] = useState<Record<string, boolean>>({})
@@ -90,30 +88,6 @@ export function TournamentPage() {
       setMatchScorecards(scorecards)
     }
   }, [tournamentId])
-
-  const handleAddFighter = () => {
-    if (!newFighterName.trim()) return
-
-    const fighter: Fighter = {
-      id: `fighter_${Date.now()}`,
-      name: newFighterName.trim(),
-      tournamentId: tournamentId!,
-    }
-
-    const updatedFighters = [...fighters, fighter]
-    setFighters(updatedFighters)
-    localStorage.setItem(`tournament_${tournamentId}_fighters`, JSON.stringify(updatedFighters))
-    
-    // Update tournament
-    const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
-    if (savedTournament) {
-      const tournament = JSON.parse(savedTournament)
-      tournament.fighters = updatedFighters.map(f => f.id)
-      localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
-    }
-    
-    setNewFighterName('')
-  }
 
   const handleDeleteFighter = (fighterId: string) => {
     const updatedFighters = fighters.filter(f => f.id !== fighterId)

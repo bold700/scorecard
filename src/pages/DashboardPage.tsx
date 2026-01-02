@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
   Container,
   Box,
@@ -17,7 +17,6 @@ import {
   Assessment,
   People,
   CheckCircle,
-  Schedule,
 } from '@mui/icons-material'
 import { Match, Scorecard, Fighter } from '../types'
 import { FighterAvatar } from '../components/FighterAvatar'
@@ -35,7 +34,6 @@ interface FighterStats {
 
 export function DashboardPage() {
   const { tournamentId } = useParams<{ tournamentId: string }>()
-  const navigate = useNavigate()
   const [tournamentName, setTournamentName] = useState<string>('')
   const [matches, setMatches] = useState<Match[]>([])
   const [fighters, setFighters] = useState<Fighter[]>([])
