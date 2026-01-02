@@ -22,7 +22,7 @@ import {
 } from '@mui/material'
 import { ExpandMore, ExpandLess, Delete } from '@mui/icons-material'
 import { Add } from '@mui/icons-material'
-import { Match, Scorecard, Fighter } from '../types'
+import { Match, Scorecard, Fighter, TournamentType, TournamentPhase } from '../types'
 import { FighterAvatar } from '../components/FighterAvatar'
 
 export function TournamentPage() {
@@ -30,6 +30,10 @@ export function TournamentPage() {
   const navigate = useNavigate()
   const [tournamentName, setTournamentName] = useState<string>('')
   const [tournamentRounds, setTournamentRounds] = useState<number>(3)
+  const [tournamentType, setTournamentType] = useState<TournamentType>('round-robin')
+  const [currentPhase, setCurrentPhase] = useState<TournamentPhase>('poule')
+  const [pouleSize, setPouleSize] = useState<number>(4)
+  const [poules, setPoules] = useState<string[][]>([])
   const [fighters, setFighters] = useState<Fighter[]>([])
   const [matches, setMatches] = useState<Match[]>([])
   const [matchScorecards, setMatchScorecards] = useState<Record<string, Scorecard[]>>({})
@@ -54,6 +58,18 @@ export function TournamentPage() {
       const rounds = tournament.rounds || 3
       setTournamentRounds(rounds)
       setGenerateRounds(rounds)
+      const type = tournament.type || 'round-robin'
+      setTournamentType(type)
+      setCurrentPhase(tournament.currentPhase || (type === 'knockout' ? 'kwartfinale' : 'poule'))
+      setPouleSize(tournament.pouleSize || 4)
+      setPoules(tournament.poules || [])
+      
+      // Update old tournaments without type
+      if (!tournament.type) {
+        tournament.type = 'round-robin'
+        tournament.currentPhase = 'poule'
+        localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+      }
     }
     
     // Load fighters
@@ -134,38 +150,91 @@ export function TournamentPage() {
     setTempFighterName('')
   }
 
+  const generatePoules = (fighterNames: string[], size: number): string[][] => {
+    const shuffled = [...fighterNames].sort(() => Math.random() - 0.5)
+    const poules: string[][] = []
+    for (let i = 0; i < shuffled.length; i += size) {
+      poules.push(shuffled.slice(i, i + size))
+    }
+    return poules
+  }
+
+
   const handleGenerateMatches = () => {
     if (fighters.length < 2) {
       alert('Voeg minimaal 2 vechters toe om wedstrijden te genereren.')
       return
     }
 
-    // Generate all possible matches (round-robin: each fighter vs each other fighter)
+    const fighterNames = fighters.map(f => f.name)
     const newMatches: Match[] = []
-    
-    for (let i = 0; i < fighters.length; i++) {
-      for (let j = i + 1; j < fighters.length; j++) {
-        // Check if match already exists
-        const matchExists = matches.some(m => 
-          (m.redFighter === fighters[i].name && m.blueFighter === fighters[j].name) ||
-          (m.redFighter === fighters[j].name && m.blueFighter === fighters[i].name)
-        )
-        
-        if (!matchExists) {
-          const match: Match = {
-            id: `match_${Date.now()}_${i}_${j}`,
-            tournamentId: tournamentId!,
-            redFighter: fighters[i].name,
-            blueFighter: fighters[j].name,
-            weightClass: '',
-            rounds: generateRounds,
-            officialJudges: [],
-            status: 'pending',
-            createdAt: Date.now(),
+    let updatedPoules: string[][] = []
+
+    if (tournamentType === 'round-robin') {
+      // Round-robin: iedereen tegen iedereen
+      for (let i = 0; i < fighters.length; i++) {
+        for (let j = i + 1; j < fighters.length; j++) {
+          const matchExists = matches.some(m => 
+            (m.redFighter === fighters[i].name && m.blueFighter === fighters[j].name) ||
+            (m.redFighter === fighters[j].name && m.blueFighter === fighters[i].name)
+          )
+          
+          if (!matchExists) {
+            const match: Match = {
+              id: `match_${Date.now()}_${i}_${j}`,
+              tournamentId: tournamentId!,
+              redFighter: fighters[i].name,
+              blueFighter: fighters[j].name,
+              weightClass: '',
+              rounds: generateRounds,
+              officialJudges: [],
+              status: 'pending',
+              createdAt: Date.now(),
+              phase: 'poule',
+            }
+            newMatches.push(match)
           }
-          newMatches.push(match)
         }
       }
+    } else if (tournamentType === 'poule-knockout') {
+      // Poule + Knockout: eerst poules, dan knockout
+      if (currentPhase === 'poule') {
+        // Genereer poules
+        updatedPoules = generatePoules(fighterNames, pouleSize)
+        
+        // Genereer wedstrijden binnen elke poule
+        updatedPoules.forEach((poule, pouleIndex) => {
+          for (let i = 0; i < poule.length; i++) {
+            for (let j = i + 1; j < poule.length; j++) {
+              const matchExists = matches.some(m => 
+                (m.redFighter === poule[i] && m.blueFighter === poule[j] && m.pouleId === `poule_${pouleIndex}`) ||
+                (m.redFighter === poule[j] && m.blueFighter === poule[i] && m.pouleId === `poule_${pouleIndex}`)
+              )
+              
+              if (!matchExists) {
+                const match: Match = {
+                  id: `match_${Date.now()}_p${pouleIndex}_${i}_${j}`,
+                  tournamentId: tournamentId!,
+                  redFighter: poule[i],
+                  blueFighter: poule[j],
+                  weightClass: '',
+                  rounds: generateRounds,
+                  officialJudges: [],
+                  status: 'pending',
+                  createdAt: Date.now(),
+                  phase: 'poule',
+                  pouleId: `poule_${pouleIndex}`,
+                }
+                newMatches.push(match)
+              }
+            }
+          }
+        })
+      }
+    } else if (tournamentType === 'knockout') {
+      // Direct knockout bracket
+      const bracketMatches = generateKnockoutBracket(fighterNames)
+      newMatches.push(...bracketMatches)
     }
 
     if (newMatches.length > 0) {
@@ -179,7 +248,14 @@ export function TournamentPage() {
         const tournament = JSON.parse(savedTournament)
         tournament.matches = updatedMatches.map(m => m.id)
         tournament.rounds = generateRounds
+        if (updatedPoules.length > 0) {
+          tournament.poules = updatedPoules
+        }
         localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+      }
+      
+      if (updatedPoules.length > 0) {
+        setPoules(updatedPoules)
       }
       
       setOpenGenerateDialog(false)
@@ -232,18 +308,329 @@ export function TournamentPage() {
     setOpenMatchDialog(false)
   }
 
+  const getPhaseLabel = (phase: TournamentPhase): string => {
+    const labels: Record<TournamentPhase, string> = {
+      poule: 'Poule Fase',
+      kwartfinale: 'Kwartfinales',
+      halve_finale: 'Halve Finales',
+      finale: 'Finale',
+      bronzen_finale: 'Bronzen Finale',
+    }
+    return labels[phase]
+  }
+
+  const calculatePouleStandings = (poule: string[], pouleMatches: Match[]): Array<{ name: string; wins: number; points: number; matchesPlayed: number }> => {
+    const standings = new Map<string, { wins: number; points: number; matchesPlayed: number }>()
+    
+    poule.forEach(fighter => {
+      standings.set(fighter, { wins: 0, points: 0, matchesPlayed: 0 })
+    })
+
+    pouleMatches.forEach(match => {
+      const scorecards = matchScorecards[match.id] || []
+      const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+      
+      if (officialScorecard) {
+        const redStanding = standings.get(match.redFighter)
+        const blueStanding = standings.get(match.blueFighter)
+        
+        if (redStanding && blueStanding) {
+          redStanding.matchesPlayed++
+          blueStanding.matchesPlayed++
+          redStanding.points += officialScorecard.totalRed
+          blueStanding.points += officialScorecard.totalBlue
+          
+          if (officialScorecard.winner === 'red') {
+            redStanding.wins++
+          } else if (officialScorecard.winner === 'blue') {
+            blueStanding.wins++
+          }
+        }
+      }
+    })
+
+    return Array.from(standings.entries())
+      .map(([name, stats]) => ({ name, ...stats }))
+      .sort((a, b) => {
+        if (b.wins !== a.wins) return b.wins - a.wins
+        return b.points - a.points
+      })
+  }
+
+  const checkPhaseComplete = (phase: TournamentPhase): boolean => {
+    const phaseMatches = matches.filter(m => m.phase === phase)
+    if (phaseMatches.length === 0) return false
+    
+    return phaseMatches.every(match => {
+      const scorecards = matchScorecards[match.id] || []
+      const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+      return officialScorecard && officialScorecard.winner !== null
+    })
+  }
+
+  const advanceToNextPhase = () => {
+    if (tournamentType !== 'poule-knockout') return
+
+    if (currentPhase === 'poule') {
+      // Bereken poule winnaars
+      const qualifiers: string[] = []
+      
+      poules.forEach((poule, pouleIndex) => {
+        const pouleMatches = matches.filter(m => m.pouleId === `poule_${pouleIndex}`)
+        const standings = calculatePouleStandings(poule, pouleMatches)
+        
+        // Top 2 van elke poule gaan door (of top 1 als er maar 1 poule is)
+        const topCount = poules.length === 1 ? 1 : 2
+        const topFighters = standings.slice(0, topCount).map(s => s.name)
+        qualifiers.push(...topFighters)
+      })
+
+      // Genereer kwartfinales
+      const nextPhase: TournamentPhase = qualifiers.length <= 4 ? 'halve_finale' : 'kwartfinale'
+      const bracketMatches = generateKnockoutBracket(qualifiers)
+      bracketMatches.forEach(m => {
+        m.phase = nextPhase
+      })
+
+      const updatedMatches = [...matches, ...bracketMatches]
+      setMatches(updatedMatches)
+      setCurrentPhase(nextPhase)
+      
+      // Update tournament
+      const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
+      if (savedTournament) {
+        const tournament = JSON.parse(savedTournament)
+        tournament.matches = updatedMatches.map(m => m.id)
+        tournament.currentPhase = nextPhase
+        localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+      }
+      
+      localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
+    } else if (currentPhase === 'kwartfinale') {
+      // Winnaars van kwartfinales gaan door naar halve finales
+      const quarterFinalMatches = matches.filter(m => m.phase === 'kwartfinale')
+      const winners: string[] = []
+      
+      quarterFinalMatches.forEach(match => {
+        const scorecards = matchScorecards[match.id] || []
+        const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+        if (officialScorecard && officialScorecard.winner) {
+          winners.push(officialScorecard.winner === 'red' ? match.redFighter : match.blueFighter)
+        }
+      })
+
+      if (winners.length === 4) {
+        const semiFinalMatches = generateKnockoutBracket(winners)
+        semiFinalMatches.forEach(m => {
+          m.phase = 'halve_finale'
+        })
+
+        const updatedMatches = [...matches, ...semiFinalMatches]
+        setMatches(updatedMatches)
+        setCurrentPhase('halve_finale')
+        
+        const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
+        if (savedTournament) {
+          const tournament = JSON.parse(savedTournament)
+          tournament.matches = updatedMatches.map(m => m.id)
+          tournament.currentPhase = 'halve_finale'
+          localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+        }
+        
+        localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
+      }
+    } else if (currentPhase === 'halve_finale') {
+      // Winnaars en verliezers van halve finales
+      const semiFinalMatches = matches.filter(m => m.phase === 'halve_finale')
+      const winners: string[] = []
+      const losers: string[] = []
+      
+      semiFinalMatches.forEach(match => {
+        const scorecards = matchScorecards[match.id] || []
+        const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+        if (officialScorecard && officialScorecard.winner) {
+          winners.push(officialScorecard.winner === 'red' ? match.redFighter : match.blueFighter)
+          losers.push(officialScorecard.winner === 'red' ? match.blueFighter : match.redFighter)
+        }
+      })
+
+      if (winners.length === 2 && losers.length === 2) {
+        // Finale
+        const finalMatch: Match = {
+          id: `match_${Date.now()}_final`,
+          tournamentId: tournamentId!,
+          redFighter: winners[0],
+          blueFighter: winners[1],
+          weightClass: '',
+          rounds: generateRounds,
+          officialJudges: [],
+          status: 'pending',
+          createdAt: Date.now(),
+          phase: 'finale',
+          bracketPosition: 1,
+        }
+
+        // Bronzen finale
+        const bronzeMatch: Match = {
+          id: `match_${Date.now()}_bronze`,
+          tournamentId: tournamentId!,
+          redFighter: losers[0],
+          blueFighter: losers[1],
+          weightClass: '',
+          rounds: generateRounds,
+          officialJudges: [],
+          status: 'pending',
+          createdAt: Date.now(),
+          phase: 'bronzen_finale',
+          bracketPosition: 1,
+        }
+
+        const updatedMatches = [...matches, finalMatch, bronzeMatch]
+        setMatches(updatedMatches)
+        setCurrentPhase('finale')
+        
+        const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
+        if (savedTournament) {
+          const tournament = JSON.parse(savedTournament)
+          tournament.matches = updatedMatches.map(m => m.id)
+          tournament.currentPhase = 'finale'
+          localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+        }
+        
+        localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
+      }
+    }
+  }
+
+  const generateKnockoutBracket = (fighterNames: string[]): Match[] => {
+    const bracketMatches: Match[] = []
+    let currentFighters = [...fighterNames]
+    let phase: TournamentPhase = 'kwartfinale'
+    
+    // Bepaal start fase op basis van aantal vechters
+    if (currentFighters.length <= 2) {
+      phase = 'finale'
+    } else if (currentFighters.length <= 4) {
+      phase = 'halve_finale'
+    } else if (currentFighters.length <= 8) {
+      phase = 'kwartfinale'
+    }
+
+    let bracketPosition = 1
+    // Genereer alleen de eerste ronde matches
+    for (let i = 0; i < currentFighters.length; i += 2) {
+      if (i + 1 < currentFighters.length) {
+        const match: Match = {
+          id: `match_${Date.now()}_${bracketPosition}`,
+          tournamentId: tournamentId!,
+          redFighter: currentFighters[i],
+          blueFighter: currentFighters[i + 1],
+          weightClass: '',
+          rounds: generateRounds,
+          officialJudges: [],
+          status: 'pending',
+          createdAt: Date.now(),
+          phase,
+          bracketPosition,
+        }
+        bracketMatches.push(match)
+        bracketPosition++
+      }
+    }
+    
+    return bracketMatches
+  }
+
   return (
     <Container maxWidth="md" sx={{ py: 4, pb: 10 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           {tournamentName || 'Toernooi'}
         </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+          <Chip 
+            label={getPhaseLabel(currentPhase)} 
+            color="primary" 
+            size="small"
+          />
+          {tournamentType === 'poule-knockout' && currentPhase === 'poule' && checkPhaseComplete('poule') && (
+            <Button
+              variant="contained"
+              size="small"
+              onClick={advanceToNextPhase}
+            >
+              Naar volgende fase
+            </Button>
+          )}
+          {tournamentType === 'poule-knockout' && currentPhase === 'kwartfinale' && checkPhaseComplete('kwartfinale') && (
+            <Button
+              variant="contained"
+              size="small"
+              onClick={advanceToNextPhase}
+            >
+              Naar halve finales
+            </Button>
+          )}
+          {tournamentType === 'poule-knockout' && currentPhase === 'halve_finale' && checkPhaseComplete('halve_finale') && (
+            <Button
+              variant="contained"
+              size="small"
+              onClick={advanceToNextPhase}
+            >
+              Naar finale
+            </Button>
+          )}
+        </Box>
       </Box>
 
 
+      {/* Poule Standen */}
+      {tournamentType === 'poule-knockout' && currentPhase === 'poule' && poules.length > 0 && (
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+            Poule Standen
+          </Typography>
+          <Grid container spacing={2}>
+            {poules.map((poule, pouleIndex) => {
+              const pouleMatches = matches.filter(m => m.pouleId === `poule_${pouleIndex}`)
+              const standings = calculatePouleStandings(poule, pouleMatches)
+              
+              return (
+                <Grid item xs={12} sm={6} key={pouleIndex}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                        Poule {pouleIndex + 1}
+                      </Typography>
+                      <Stack spacing={1}>
+                        {standings.map((standing, index) => (
+                          <Box key={standing.name} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="body2" fontWeight={index < 2 ? 600 : 400}>
+                                {index + 1}. {standing.name}
+                              </Typography>
+                              {index < 2 && (
+                                <Chip label="Q" color="success" size="small" sx={{ height: 18, fontSize: '0.65rem' }} />
+                              )}
+                            </Box>
+                            <Typography variant="body2" color="text.secondary">
+                              {standing.wins}W - {standing.points}P
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )
+            })}
+          </Grid>
+        </Box>
+      )}
+
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-          Wedstrijden
+          Wedstrijden {currentPhase !== 'poule' && `- ${getPhaseLabel(currentPhase)}`}
         </Typography>
         {matches.length === 0 ? (
           <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
@@ -251,7 +638,9 @@ export function TournamentPage() {
           </Typography>
         ) : (
           <Stack spacing={2}>
-              {matches.map((match) => {
+              {matches
+                .filter(match => match.phase === currentPhase || !match.phase)
+                .map((match) => {
                 const scorecards = matchScorecards[match.id] || []
                 // Get the first official scorecard or first scorecard
                 const displayScorecard = scorecards.find((s) => s.isOfficial) || scorecards[0]

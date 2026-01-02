@@ -14,7 +14,7 @@ import {
   ListItemText,
   ListItemButton,
 } from '@mui/material'
-import { PlayArrow, Stop, PersonAdd } from '@mui/icons-material'
+import { PersonAdd } from '@mui/icons-material'
 import { Match } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 
@@ -35,32 +35,6 @@ export function MatchPage() {
       }
     }
   }, [tournamentId, matchId])
-
-  const handleStartMatch = () => {
-    if (!match) return
-    const updatedMatch = { ...match, status: 'active' as const, startedAt: Date.now() }
-    setMatch(updatedMatch)
-    // Save to localStorage
-    const savedMatches = localStorage.getItem(`tournament_${tournamentId}_matches`)
-    if (savedMatches) {
-      const matches: Match[] = JSON.parse(savedMatches)
-      const updatedMatches = matches.map((m) => (m.id === matchId ? updatedMatch : m))
-      localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
-    }
-  }
-
-  const handleEndMatch = () => {
-    if (!match) return
-    const updatedMatch = { ...match, status: 'completed' as const, completedAt: Date.now() }
-    setMatch(updatedMatch)
-    // Save to localStorage
-    const savedMatches = localStorage.getItem(`tournament_${tournamentId}_matches`)
-    if (savedMatches) {
-      const matches: Match[] = JSON.parse(savedMatches)
-      const updatedMatches = matches.map((m) => (m.id === matchId ? updatedMatch : m))
-      localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
-    }
-  }
 
   const handleJoinAsJudge = () => {
     if (!match || !user) return
@@ -97,39 +71,10 @@ export function MatchPage() {
           <Stack spacing={2}>
             <Box>
               <Typography variant="h6" gutterBottom>
-                Status
-              </Typography>
-              {match.status === 'pending' && (
-                <Button
-                  variant="contained"
-                  startIcon={<PlayArrow />}
-                  onClick={handleStartMatch}
-                  fullWidth
-                  size="large"
-                >
-                  Wedstrijd Starten
-                </Button>
-              )}
-              {match.status === 'active' && (
-                <Button
-                  variant="contained"
-                  color="error"
-                  startIcon={<Stop />}
-                  onClick={handleEndMatch}
-                  fullWidth
-                  size="large"
-                >
-                  Wedstrijd Beëindigen
-                </Button>
-              )}
-            </Box>
-
-            <Box>
-              <Typography variant="h6" gutterBottom>
                 Scorecard
               </Typography>
               <Button
-                variant="outlined"
+                variant="contained"
                 startIcon={<PersonAdd />}
                 onClick={handleJoinAsJudge}
                 fullWidth

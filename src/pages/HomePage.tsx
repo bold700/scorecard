@@ -14,10 +14,14 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material'
 import { Delete } from '@mui/icons-material'
 import { useAuthStore } from '../store/useAuthStore'
-import { Tournament } from '../types'
+import { Tournament, TournamentType } from '../types'
 
 interface HomePageProps {
   createDialogOpen: boolean
@@ -31,6 +35,8 @@ export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProp
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tournamentToDelete, setTournamentToDelete] = useState<Tournament | null>(null)
   const [tournamentName, setTournamentName] = useState('')
+  const [tournamentType, setTournamentType] = useState<'round-robin' | 'poule-knockout' | 'knockout'>('round-robin')
+  const [pouleSize, setPouleSize] = useState(4)
 
   useEffect(() => {
     loadTournaments()
@@ -63,7 +69,7 @@ export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProp
     // Create tournament (in real app, this would be saved to Firebase)
     const tournamentId = `tournament_${Date.now()}`
     // Save tournament info to localStorage
-    const tournament = {
+    const tournament: Tournament = {
       id: tournamentId,
       name: tournamentName,
       createdAt: Date.now(),
@@ -71,6 +77,10 @@ export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProp
       fighters: [],
       matches: [],
       rounds: 3,
+      type: tournamentType,
+      currentPhase: tournamentType === 'poule-knockout' ? 'poule' : tournamentType === 'knockout' ? 'kwartfinale' : 'poule',
+      pouleSize: tournamentType === 'poule-knockout' ? pouleSize : undefined,
+      poules: tournamentType === 'poule-knockout' ? [] : undefined,
     }
     localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
     
@@ -197,6 +207,33 @@ export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProp
                 }
               }}
             />
+            <FormControl fullWidth>
+              <InputLabel>Toernooi Type</InputLabel>
+              <Select
+                value={tournamentType}
+                onChange={(e) => setTournamentType(e.target.value as TournamentType)}
+                label="Toernooi Type"
+              >
+                <MenuItem value="round-robin">Round-Robin (iedereen tegen iedereen)</MenuItem>
+                <MenuItem value="poule-knockout">Poule + Knockout</MenuItem>
+                <MenuItem value="knockout">Knockout (direct)</MenuItem>
+              </Select>
+            </FormControl>
+            {tournamentType === 'poule-knockout' && (
+              <FormControl fullWidth>
+                <InputLabel>Aantal vechters per poule</InputLabel>
+                <Select
+                  value={pouleSize}
+                  onChange={(e) => setPouleSize(Number(e.target.value))}
+                  label="Aantal vechters per poule"
+                >
+                  <MenuItem value={3}>3 vechters</MenuItem>
+                  <MenuItem value={4}>4 vechters</MenuItem>
+                  <MenuItem value={5}>5 vechters</MenuItem>
+                  <MenuItem value={6}>6 vechters</MenuItem>
+                </Select>
+              </FormControl>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>

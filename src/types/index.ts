@@ -13,6 +13,9 @@ export interface Fighter {
   tournamentId: string
 }
 
+export type TournamentType = 'round-robin' | 'poule-knockout' | 'knockout'
+export type TournamentPhase = 'poule' | 'kwartfinale' | 'halve_finale' | 'finale' | 'bronzen_finale'
+
 export interface Tournament {
   id: string
   name: string
@@ -21,6 +24,10 @@ export interface Tournament {
   fighters: string[] // Fighter IDs
   matches: string[] // Match IDs
   rounds: number // Default number of rounds for matches
+  type: TournamentType
+  currentPhase: TournamentPhase
+  pouleSize?: number // Aantal vechters per poule
+  poules?: string[][] // Array van poules, elke poule bevat fighter names
 }
 
 export interface Match {
@@ -35,6 +42,9 @@ export interface Match {
   createdAt: number
   startedAt?: number
   completedAt?: number
+  phase?: TournamentPhase
+  pouleId?: string // Voor poule wedstrijden
+  bracketPosition?: number // Voor knockout bracket positie
 }
 
 export interface ScoreEvent {
