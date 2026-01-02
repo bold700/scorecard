@@ -22,6 +22,7 @@ import {
 import { Delete } from '@mui/icons-material'
 import { useAuthStore } from '../store/useAuthStore'
 import { Tournament, TournamentType } from '../types'
+import { firebaseService } from '../lib/firebase'
 
 interface HomePageProps {
   createDialogOpen: boolean
@@ -39,36 +40,23 @@ export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProp
   const [pouleSize, setPouleSize] = useState(4)
 
   useEffect(() => {
-    loadTournaments()
-  }, [])
+    // Subscribe to tournaments for real-time updates
+    const unsubscribe = firebaseService.subscribeToTournaments((tournaments) => {
+      setExistingTournaments(tournaments as Tournament[])
+    })
 
-  const loadTournaments = () => {
-    // Load all tournaments from localStorage
-    const tournaments: Tournament[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key?.startsWith('tournament_') && !key.includes('_matches') && !key.includes('_fighters')) {
-        try {
-          const tournament = JSON.parse(localStorage.getItem(key)!)
-          if (tournament && tournament.id && tournament.name) {
-            tournaments.push(tournament)
-          }
-        } catch (e) {
-          // Skip invalid entries
-        }
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe()
       }
     }
-    // Sort by creation date (newest first)
-    tournaments.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-    setExistingTournaments(tournaments)
-  }
+  }, [])
 
-  const handleCreateTournament = () => {
+  const handleCreateTournament = async () => {
     if (!tournamentName.trim()) return
 
-    // Create tournament (in real app, this would be saved to Firebase)
+    // Create tournament
     const tournamentId = `tournament_${Date.now()}`
-    // Save tournament info to localStorage
     const tournament: Tournament = {
       id: tournamentId,
       name: tournamentName,
@@ -82,14 +70,15 @@ export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProp
       pouleSize: tournamentType === 'poule-knockout' ? pouleSize : undefined,
       poules: tournamentType === 'poule-knockout' ? [] : undefined,
     }
-    localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+    
+    // Save to Firebase (with localStorage fallback)
+    await firebaseService.saveTournament(tournament)
     
     // Reset form
     setTournamentName('')
     setCreateDialogOpen(false)
     
-    // Refresh tournaments list
-    loadTournaments()
+    // Navigate to tournament page
     navigate(`/tournament/${tournamentId}`)
   }
 
@@ -99,15 +88,13 @@ export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProp
     setDeleteDialogOpen(true)
   }
 
-  const confirmDeleteTournament = () => {
+  const confirmDeleteTournament = async () => {
     if (!tournamentToDelete) return
 
-    // Delete tournament and all related data
-    localStorage.removeItem(`tournament_${tournamentToDelete.id}`)
-    localStorage.removeItem(`tournament_${tournamentToDelete.id}_matches`)
-    localStorage.removeItem(`tournament_${tournamentToDelete.id}_fighters`)
+    // Delete tournament from Firebase (with localStorage fallback)
+    await firebaseService.deleteTournament(tournamentToDelete.id)
     
-    // Delete all scorecards for matches in this tournament
+    // Delete all scorecards for matches in this tournament (localStorage only for now)
     const savedMatches = localStorage.getItem(`tournament_${tournamentToDelete.id}_matches`)
     if (savedMatches) {
       const matches = JSON.parse(savedMatches)
@@ -121,8 +108,6 @@ export function HomePage({ createDialogOpen, setCreateDialogOpen }: HomePageProp
       })
     }
 
-    // Remove from list
-    loadTournaments()
     setDeleteDialogOpen(false)
     setTournamentToDelete(null)
   }

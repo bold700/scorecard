@@ -24,6 +24,7 @@ import { ExpandMore, ExpandLess, Delete } from '@mui/icons-material'
 import { Add } from '@mui/icons-material'
 import { Match, Scorecard, Fighter, TournamentType, TournamentPhase } from '../types'
 import { FighterAvatar } from '../components/FighterAvatar'
+import { firebaseService } from '../lib/firebase'
 
 export function TournamentPage() {
   const { tournamentId } = useParams<{ tournamentId: string }>()
@@ -50,83 +51,83 @@ export function TournamentPage() {
   const [tempFighterName, setTempFighterName] = useState('')
 
   useEffect(() => {
-    // Load tournament info
-    const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
-    if (savedTournament) {
-      const tournament = JSON.parse(savedTournament)
-      setTournamentName(tournament.name || 'Toernooi')
-      const rounds = tournament.rounds || 3
-      setTournamentRounds(rounds)
-      setGenerateRounds(rounds)
-      const type = tournament.type || 'round-robin'
-      setTournamentType(type)
-      setCurrentPhase(tournament.currentPhase || (type === 'knockout' ? 'kwartfinale' : 'poule'))
-      setPouleSize(tournament.pouleSize || 4)
-      setPoules(tournament.poules || [])
+    const loadTournamentData = async () => {
+      // Load tournament info from Firebase (with localStorage fallback)
+      const tournament = await firebaseService.getTournament(tournamentId!)
+      if (tournament) {
+        setTournamentName(tournament.name || 'Toernooi')
+        const rounds = tournament.rounds || 3
+        setTournamentRounds(rounds)
+        setGenerateRounds(rounds)
+        const type = tournament.type || 'round-robin'
+        setTournamentType(type)
+        setCurrentPhase(tournament.currentPhase || (type === 'knockout' ? 'kwartfinale' : 'poule'))
+        setPouleSize(tournament.pouleSize || 4)
+        setPoules(tournament.poules || [])
+        
+        // Update old tournaments without type
+        if (!tournament.type) {
+          tournament.type = 'round-robin'
+          tournament.currentPhase = 'poule'
+          await firebaseService.saveTournament(tournament)
+        }
+      }
       
-      // Update old tournaments without type
-      if (!tournament.type) {
-        tournament.type = 'round-robin'
-        tournament.currentPhase = 'poule'
-        localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+      // Load fighters from Firebase (with localStorage fallback)
+      const fightersData = await firebaseService.getFighters(tournamentId!)
+      if (fightersData) {
+        setFighters(fightersData)
+      }
+      
+      // Load matches from Firebase (with localStorage fallback)
+      const matchesData = await firebaseService.getMatches(tournamentId!)
+      if (matchesData) {
+        setMatches(matchesData)
+
+        // Load scorecards for each match (still from localStorage for now)
+        const scorecards: Record<string, Scorecard[]> = {}
+        matchesData.forEach((match) => {
+          const matchScorecards: Scorecard[] = []
+          // Get all scorecards for this match
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i)
+            if (key?.startsWith(`scorecard_${match.id}_`)) {
+              const scorecard = JSON.parse(localStorage.getItem(key)!)
+              matchScorecards.push(scorecard)
+            }
+          }
+          scorecards[match.id] = matchScorecards
+        })
+        setMatchScorecards(scorecards)
       }
     }
-    
-    // Load fighters
-    const savedFighters = localStorage.getItem(`tournament_${tournamentId}_fighters`)
-    if (savedFighters) {
-      const fightersData: Fighter[] = JSON.parse(savedFighters)
-      setFighters(fightersData)
-    }
-    
-    // In real app, fetch matches from Firebase
-    // For now, load from localStorage
-    const savedMatches = localStorage.getItem(`tournament_${tournamentId}_matches`)
-    if (savedMatches) {
-      const matchesData: Match[] = JSON.parse(savedMatches)
-      setMatches(matchesData)
 
-      // Load scorecards for each match
-      const scorecards: Record<string, Scorecard[]> = {}
-      matchesData.forEach((match) => {
-        const matchScorecards: Scorecard[] = []
-        // Get all scorecards for this match
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i)
-          if (key?.startsWith(`scorecard_${match.id}_`)) {
-            const scorecard = JSON.parse(localStorage.getItem(key)!)
-            matchScorecards.push(scorecard)
-          }
-        }
-        scorecards[match.id] = matchScorecards
-      })
-      setMatchScorecards(scorecards)
-    }
+    loadTournamentData()
   }, [tournamentId])
 
-  const handleDeleteFighter = (fighterId: string) => {
+  const handleDeleteFighter = async (fighterId: string) => {
     const updatedFighters = fighters.filter(f => f.id !== fighterId)
     setFighters(updatedFighters)
-    localStorage.setItem(`tournament_${tournamentId}_fighters`, JSON.stringify(updatedFighters))
+    await firebaseService.saveFighters(tournamentId!, updatedFighters)
     
     // Update tournament
-    const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
-    if (savedTournament) {
-      const tournament = JSON.parse(savedTournament)
+    const tournament = await firebaseService.getTournament(tournamentId!)
+    if (tournament) {
       tournament.fighters = updatedFighters.map(f => f.id)
-      localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+      await firebaseService.saveTournament(tournament)
     }
     
     // Delete matches involving this fighter
+    const deletedFighter = fighters.find(f => f.id === fighterId)
     const updatedMatches = matches.filter(m => 
-      m.redFighter !== fighters.find(f => f.id === fighterId)?.name &&
-      m.blueFighter !== fighters.find(f => f.id === fighterId)?.name
+      m.redFighter !== deletedFighter?.name &&
+      m.blueFighter !== deletedFighter?.name
     )
     setMatches(updatedMatches)
-    localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
+    await firebaseService.saveMatches(tournamentId!, updatedMatches)
   }
 
-  const handleAddTempFighter = () => {
+  const handleAddTempFighter = async () => {
     if (!tempFighterName.trim()) return
 
     const fighter: Fighter = {
@@ -137,14 +138,13 @@ export function TournamentPage() {
 
     const updatedFighters = [...fighters, fighter]
     setFighters(updatedFighters)
-    localStorage.setItem(`tournament_${tournamentId}_fighters`, JSON.stringify(updatedFighters))
+    await firebaseService.saveFighters(tournamentId!, updatedFighters)
     
     // Update tournament
-    const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
-    if (savedTournament) {
-      const tournament = JSON.parse(savedTournament)
+    const tournament = await firebaseService.getTournament(tournamentId!)
+    if (tournament) {
       tournament.fighters = updatedFighters.map(f => f.id)
-      localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+      await firebaseService.saveTournament(tournament)
     }
     
     setTempFighterName('')
@@ -160,7 +160,7 @@ export function TournamentPage() {
   }
 
 
-  const handleGenerateMatches = () => {
+  const handleGenerateMatches = async () => {
     if (fighters.length < 2) {
       alert('Voeg minimaal 2 vechters toe om wedstrijden te genereren.')
       return
@@ -240,18 +240,17 @@ export function TournamentPage() {
     if (newMatches.length > 0) {
       const updatedMatches = [...matches, ...newMatches]
       setMatches(updatedMatches)
-      localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
+      await firebaseService.saveMatches(tournamentId!, updatedMatches)
       
       // Update tournament
-      const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
-      if (savedTournament) {
-        const tournament = JSON.parse(savedTournament)
+      const tournament = await firebaseService.getTournament(tournamentId!)
+      if (tournament) {
         tournament.matches = updatedMatches.map(m => m.id)
         tournament.rounds = generateRounds
         if (updatedPoules.length > 0) {
           tournament.poules = updatedPoules
         }
-        localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+        await firebaseService.saveTournament(tournament)
       }
       
       if (updatedPoules.length > 0) {
@@ -266,7 +265,7 @@ export function TournamentPage() {
     }
   }
 
-  const handleCreateManualMatch = () => {
+  const handleCreateManualMatch = async () => {
     if (!manualMatch.redFighter || !manualMatch.blueFighter || manualMatch.redFighter === manualMatch.blueFighter) return
 
     // Check if match already exists
@@ -294,14 +293,13 @@ export function TournamentPage() {
 
     const updatedMatches = [...matches, match]
     setMatches(updatedMatches)
-    localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
+    await firebaseService.saveMatches(tournamentId!, updatedMatches)
     
     // Update tournament
-    const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
-    if (savedTournament) {
-      const tournament = JSON.parse(savedTournament)
+    const tournament = await firebaseService.getTournament(tournamentId!)
+    if (tournament) {
       tournament.matches = updatedMatches.map(m => m.id)
-      localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+      await firebaseService.saveTournament(tournament)
     }
     
     setManualMatch({ redFighter: '', blueFighter: '', rounds: tournamentRounds })
@@ -368,7 +366,7 @@ export function TournamentPage() {
     })
   }
 
-  const advanceToNextPhase = () => {
+  const advanceToNextPhase = async () => {
     if (tournamentType !== 'poule-knockout') return
 
     if (currentPhase === 'poule') {
@@ -397,15 +395,14 @@ export function TournamentPage() {
       setCurrentPhase(nextPhase)
       
       // Update tournament
-      const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
-      if (savedTournament) {
-        const tournament = JSON.parse(savedTournament)
+      const tournament = await firebaseService.getTournament(tournamentId!)
+      if (tournament) {
         tournament.matches = updatedMatches.map(m => m.id)
         tournament.currentPhase = nextPhase
-        localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+        await firebaseService.saveTournament(tournament)
       }
       
-      localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
+      await firebaseService.saveMatches(tournamentId!, updatedMatches)
     } else if (currentPhase === 'kwartfinale') {
       // Winnaars van kwartfinales gaan door naar halve finales
       const quarterFinalMatches = matches.filter(m => m.phase === 'kwartfinale')
@@ -429,15 +426,14 @@ export function TournamentPage() {
         setMatches(updatedMatches)
         setCurrentPhase('halve_finale')
         
-        const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
-        if (savedTournament) {
-          const tournament = JSON.parse(savedTournament)
+        const tournament = await firebaseService.getTournament(tournamentId!)
+        if (tournament) {
           tournament.matches = updatedMatches.map(m => m.id)
           tournament.currentPhase = 'halve_finale'
-          localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+          await firebaseService.saveTournament(tournament)
         }
         
-        localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
+        await firebaseService.saveMatches(tournamentId!, updatedMatches)
       }
     } else if (currentPhase === 'halve_finale') {
       // Winnaars en verliezers van halve finales
@@ -489,15 +485,14 @@ export function TournamentPage() {
         setMatches(updatedMatches)
         setCurrentPhase('finale')
         
-        const savedTournament = localStorage.getItem(`tournament_${tournamentId}`)
-        if (savedTournament) {
-          const tournament = JSON.parse(savedTournament)
+        const tournament = await firebaseService.getTournament(tournamentId!)
+        if (tournament) {
           tournament.matches = updatedMatches.map(m => m.id)
           tournament.currentPhase = 'finale'
-          localStorage.setItem(`tournament_${tournamentId}`, JSON.stringify(tournament))
+          await firebaseService.saveTournament(tournament)
         }
         
-        localStorage.setItem(`tournament_${tournamentId}_matches`, JSON.stringify(updatedMatches))
+        await firebaseService.saveMatches(tournamentId!, updatedMatches)
       }
     }
   }

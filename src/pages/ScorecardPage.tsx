@@ -20,6 +20,7 @@ import { CheckCircle, ArrowBack, ArrowForward, Delete } from '@mui/icons-materia
 import { Scorecard, ScoreEvent, Match, RoundScore } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { FighterAvatar } from '../components/FighterAvatar'
+import { firebaseService } from '../lib/firebase'
 
 export function ScorecardPage() {
   const { tournamentId, matchId, userId } = useParams<{
@@ -35,11 +36,11 @@ export function ScorecardPage() {
   const [completedRounds, setCompletedRounds] = useState<number[]>([])
 
   useEffect(() => {
-    // Load match
-    const savedMatches = localStorage.getItem(`tournament_${tournamentId}_matches`)
-    if (savedMatches) {
-      const matches: Match[] = JSON.parse(savedMatches)
+    const loadMatch = async () => {
+      // Load match from Firebase (with localStorage fallback)
+      const matches = await firebaseService.getMatches(tournamentId!)
       const foundMatch = matches.find((m) => m.id === matchId)
+      
       if (foundMatch) {
         setMatch(foundMatch)
         setCurrentRound(1)
@@ -79,6 +80,8 @@ export function ScorecardPage() {
         }
       }
     }
+    
+    loadMatch()
   }, [tournamentId, matchId, userId, user])
 
   const handleScoreEvent = (corner: 'red' | 'blue', type: 'point' | 'deduction', value: number) => {

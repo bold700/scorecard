@@ -9,33 +9,24 @@ import {
   CardContent,
 } from '@mui/material'
 import { Tournament } from '../types'
+import { firebaseService } from '../lib/firebase'
 
 export function InsightsSelectionPage() {
   const navigate = useNavigate()
   const [tournaments, setTournaments] = useState<Tournament[]>([])
 
   useEffect(() => {
-    loadTournaments()
-  }, [])
+    // Subscribe to tournaments for real-time updates
+    const unsubscribe = firebaseService.subscribeToTournaments((tournaments) => {
+      setTournaments(tournaments as Tournament[])
+    })
 
-  const loadTournaments = () => {
-    const tournamentsList: Tournament[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key?.startsWith('tournament_') && !key.includes('_matches') && !key.includes('_fighters')) {
-        try {
-          const tournament = JSON.parse(localStorage.getItem(key)!)
-          if (tournament && tournament.id && tournament.name) {
-            tournamentsList.push(tournament)
-          }
-        } catch (e) {
-          // Skip invalid entries
-        }
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe()
       }
     }
-    tournamentsList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-    setTournaments(tournamentsList)
-  }
+  }, [])
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
