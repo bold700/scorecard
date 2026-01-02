@@ -16,9 +16,12 @@ if (pathname.includes('/?/')) {
   window.history.replaceState({}, '', newPathname + search + hash)
 }
 
+// Get base path from vite config (for GitHub Pages)
+const base = import.meta.env.BASE_URL || '/'
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={base}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <App />
