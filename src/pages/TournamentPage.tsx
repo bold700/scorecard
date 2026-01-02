@@ -26,6 +26,7 @@ import { Match, Scorecard, Fighter, TournamentType, TournamentPhase } from '../t
 import { FighterAvatar } from '../components/FighterAvatar'
 import { BracketVisualization } from '../components/BracketVisualization'
 import { firebaseService } from '../lib/firebase'
+import { createAggregatedScorecard } from '../lib/scorecardAggregation'
 
 export function TournamentPage() {
   const { tournamentId } = useParams<{ tournamentId: string }>()
@@ -86,20 +87,12 @@ export function TournamentPage() {
       if (matchesData) {
         setMatches(matchesData)
 
-        // Load scorecards for each match (still from localStorage for now)
+        // Load ALL scorecards for each match from Firebase
         const scorecards: Record<string, Scorecard[]> = {}
-        matchesData.forEach((match) => {
-          const matchScorecards: Scorecard[] = []
-          // Get all scorecards for this match
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i)
-            if (key?.startsWith(`scorecard_${match.id}_`)) {
-              const scorecard = JSON.parse(localStorage.getItem(key)!)
-              matchScorecards.push(scorecard)
-            }
-          }
-          scorecards[match.id] = matchScorecards
-        })
+        for (const match of matchesData) {
+          const allScorecards = await firebaseService.getAllScorecardsForMatch(match.id)
+          scorecards[match.id] = allScorecards
+        }
         setMatchScorecards(scorecards)
       }
     }
@@ -328,7 +321,7 @@ export function TournamentPage() {
 
     pouleMatches.forEach(match => {
       const scorecards = matchScorecards[match.id] || []
-      const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+      const officialScorecard = createAggregatedScorecard(match.id, scorecards) || scorecards[0]
       
       if (officialScorecard) {
         const redStanding = standings.get(match.redFighter)
@@ -363,7 +356,7 @@ export function TournamentPage() {
     
     return phaseMatches.every(match => {
       const scorecards = matchScorecards[match.id] || []
-      const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+      const officialScorecard = createAggregatedScorecard(match.id, scorecards) || scorecards[0]
       return officialScorecard && officialScorecard.winner !== null
     })
   }
@@ -412,7 +405,7 @@ export function TournamentPage() {
       
       quarterFinalMatches.forEach(match => {
         const scorecards = matchScorecards[match.id] || []
-        const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+        const officialScorecard = createAggregatedScorecard(match.id, scorecards) || scorecards[0]
         if (officialScorecard && officialScorecard.winner) {
           winners.push(officialScorecard.winner === 'red' ? match.redFighter : match.blueFighter)
         }
@@ -445,7 +438,7 @@ export function TournamentPage() {
       
       semiFinalMatches.forEach(match => {
         const scorecards = matchScorecards[match.id] || []
-        const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+        const officialScorecard = createAggregatedScorecard(match.id, scorecards) || scorecards[0]
         if (officialScorecard && officialScorecard.winner) {
           winners.push(officialScorecard.winner === 'red' ? match.redFighter : match.blueFighter)
           losers.push(officialScorecard.winner === 'red' ? match.blueFighter : match.redFighter)
@@ -693,8 +686,8 @@ export function TournamentPage() {
                 })
                 .map((match) => {
                 const scorecards = matchScorecards[match.id] || []
-                // Get the first official scorecard or first scorecard
-                const displayScorecard = scorecards.find((s) => s.isOfficial) || scorecards[0]
+                // Create aggregated scorecard from all user scorecards
+                const displayScorecard = createAggregatedScorecard(match.id, scorecards) || scorecards[0]
                 const hasScores = displayScorecard && (displayScorecard.totalRed > 0 || displayScorecard.totalBlue > 0)
                 const winner = displayScorecard?.winner
                 const maxPossibleScore = match.rounds * 10 // 10 punten per ronde

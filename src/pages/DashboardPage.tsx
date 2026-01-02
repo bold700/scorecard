@@ -21,6 +21,7 @@ import {
 import { Match, Scorecard, Fighter } from '../types'
 import { FighterAvatar } from '../components/FighterAvatar'
 import { firebaseService } from '../lib/firebase'
+import { createAggregatedScorecard } from '../lib/scorecardAggregation'
 
 interface FighterStats {
   name: string
@@ -72,32 +73,11 @@ export function DashboardPage() {
       if (matchesData && matchesData.length > 0) {
         setMatches(matchesData)
         
-        // Load scorecards for all matches
+        // Load ALL scorecards for all matches from Firebase
         const scorecardsMap: Record<string, Scorecard[]> = {}
         for (const match of matchesData) {
-          // Try to get scorecard from Firebase
-          const savedUser = localStorage.getItem('auth_user')
-          const user = savedUser ? JSON.parse(savedUser) : null
-          if (user && user.id) {
-            const scorecard = await firebaseService.getScorecard(match.id, user.id)
-            if (scorecard) {
-              scorecardsMap[match.id] = [scorecard]
-            }
-          }
-          
-          // Fallback to localStorage
-          if (!scorecardsMap[match.id]) {
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i)
-              if (key?.startsWith(`scorecard_${match.id}_`)) {
-                const scorecard: Scorecard = JSON.parse(localStorage.getItem(key)!)
-                if (!scorecardsMap[match.id]) {
-                  scorecardsMap[match.id] = []
-                }
-                scorecardsMap[match.id].push(scorecard)
-              }
-            }
-          }
+          const allScorecards = await firebaseService.getAllScorecardsForMatch(match.id)
+          scorecardsMap[match.id] = allScorecards
         }
         setMatchScorecards(scorecardsMap)
         
@@ -165,9 +145,9 @@ export function DashboardPage() {
 
     // Process each match
     matchesData.forEach((match) => {
-      // Get official scorecard for this match
+      // Get aggregated scorecard for this match
       const scorecards = scorecardsMap[match.id] || []
-      const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+      const officialScorecard = createAggregatedScorecard(match.id, scorecards) || scorecards[0]
 
       if (officialScorecard && officialScorecard.winner) {
         completedMatches.push({ match, scorecard: officialScorecard })

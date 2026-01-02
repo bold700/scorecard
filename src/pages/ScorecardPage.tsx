@@ -45,22 +45,21 @@ export function ScorecardPage() {
         setMatch(foundMatch)
         setCurrentRound(1)
 
-        // Load or create scorecard after match is loaded
-        const savedScorecard = localStorage.getItem(`scorecard_${matchId}_${userId}`)
-        if (savedScorecard) {
-          const loaded = JSON.parse(savedScorecard)
-          setScorecard(loaded)
+        // Load or create scorecard for THIS user only
+        const loadedScorecard = await firebaseService.getScorecard(matchId!, userId!)
+        if (loadedScorecard) {
+          setScorecard(loadedScorecard)
           // Load completed rounds
-          const savedCompleted = localStorage.getItem(`completed_rounds_${matchId}_${userId}`)
-          if (savedCompleted) {
-            setCompletedRounds(JSON.parse(savedCompleted))
-          }
+          const completed = loadedScorecard.rounds
+            .filter((r: RoundScore) => r.redTotal > 0 || r.blueTotal > 0)
+            .map((r: RoundScore) => r.round)
+          setCompletedRounds(completed)
         } else {
-          // Create new scorecard
+          // Create new scorecard for this user
           const newScorecard: Scorecard = {
             matchId: matchId!,
             userId: userId!,
-            isOfficial: user?.role === 'organizer' || user?.role === 'official_judge',
+            isOfficial: false, // Users zijn geen official judges, alleen hun eigen scores
             rounds: Array.from({ length: foundMatch.rounds }, (_, i) => ({
               round: i + 1,
               redPoints: 0,
@@ -76,7 +75,7 @@ export function ScorecardPage() {
             events: [],
           }
           setScorecard(newScorecard)
-          localStorage.setItem(`scorecard_${matchId}_${userId}`, JSON.stringify(newScorecard))
+          await firebaseService.saveScorecard(newScorecard)
         }
       }
     }
@@ -84,7 +83,7 @@ export function ScorecardPage() {
     loadMatch()
   }, [tournamentId, matchId, userId, user])
 
-  const handleScoreEvent = (corner: 'red' | 'blue', type: 'point' | 'deduction', value: number) => {
+  const handleScoreEvent = async (corner: 'red' | 'blue', type: 'point' | 'deduction', value: number) => {
     if (!scorecard || !match) return
 
     const event: ScoreEvent = {
@@ -117,6 +116,9 @@ export function ScorecardPage() {
     }
 
     setScorecard(updatedScorecard)
+    // Save to Firebase
+    await firebaseService.saveScorecard(updatedScorecard)
+    // Also save to localStorage as backup
     localStorage.setItem(`scorecard_${matchId}_${userId}`, JSON.stringify(updatedScorecard))
   }
 
@@ -179,7 +181,7 @@ export function ScorecardPage() {
     return rounds
   }
 
-  const handleDeleteEvent = (eventId: string) => {
+  const handleDeleteEvent = async (eventId: string) => {
     if (!scorecard || !match) return
 
     const updatedEvents = scorecard.events.filter((e) => e.id !== eventId)
@@ -201,6 +203,9 @@ export function ScorecardPage() {
     }
 
     setScorecard(updatedScorecard)
+    // Save to Firebase
+    await firebaseService.saveScorecard(updatedScorecard)
+    // Also save to localStorage as backup
     localStorage.setItem(`scorecard_${matchId}_${userId}`, JSON.stringify(updatedScorecard))
   }
 

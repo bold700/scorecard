@@ -265,6 +265,113 @@ export const firebaseService = {
       return saved ? JSON.parse(saved) : []
     }
   },
+
+  // Scorecards
+  async saveScorecard(scorecard: any) {
+    // Filter out undefined values
+    const cleanedScorecard = Object.fromEntries(
+      Object.entries(scorecard).filter(([, value]) => value !== undefined)
+    )
+    
+    if (!isFirebaseAvailable()) {
+      localStorage.setItem(`scorecard_${scorecard.matchId}_${scorecard.userId}`, JSON.stringify(scorecard))
+      return
+    }
+    
+    try {
+      const scorecardRef = doc(db, 'scorecards', `${scorecard.matchId}_${scorecard.userId}`)
+      await setDoc(scorecardRef, cleanedScorecard)
+    } catch (error) {
+      console.error('Error saving scorecard:', error)
+      localStorage.setItem(`scorecard_${scorecard.matchId}_${scorecard.userId}`, JSON.stringify(scorecard))
+    }
+  },
+
+  async getScorecard(matchId: string, userId: string): Promise<any | null> {
+    if (!isFirebaseAvailable()) {
+      const saved = localStorage.getItem(`scorecard_${matchId}_${userId}`)
+      return saved ? JSON.parse(saved) : null
+    }
+    
+    try {
+      const scorecardRef = doc(db, 'scorecards', `${matchId}_${userId}`)
+      const docSnap = await getDoc(scorecardRef)
+      if (docSnap.exists()) {
+        return docSnap.data()
+      }
+      const saved = localStorage.getItem(`scorecard_${matchId}_${userId}`)
+      return saved ? JSON.parse(saved) : null
+    } catch (error) {
+      console.error('Error getting scorecard:', error)
+      const saved = localStorage.getItem(`scorecard_${matchId}_${userId}`)
+      return saved ? JSON.parse(saved) : null
+    }
+  },
+
+  async getAllScorecardsForMatch(matchId: string): Promise<any[]> {
+    if (!isFirebaseAvailable()) {
+      // Fallback naar localStorage
+      const scorecards: any[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key?.startsWith(`scorecard_${matchId}_`)) {
+          try {
+            const scorecard = JSON.parse(localStorage.getItem(key)!)
+            scorecards.push(scorecard)
+          } catch (e) {
+            // Skip invalid entries
+          }
+        }
+      }
+      return scorecards
+    }
+    
+    try {
+      const scorecardsRef = collection(db, 'scorecards')
+      const querySnapshot = await getDocs(scorecardsRef)
+      const scorecards: any[] = []
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        if (data.matchId === matchId) {
+          scorecards.push(data)
+        }
+      })
+      
+      // Also check localStorage for any missing ones
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key?.startsWith(`scorecard_${matchId}_`)) {
+          try {
+            const scorecard = JSON.parse(localStorage.getItem(key)!)
+            // Only add if not already in Firebase results
+            if (!scorecards.find(s => s.userId === scorecard.userId)) {
+              scorecards.push(scorecard)
+            }
+          } catch (e) {
+            // Skip invalid entries
+          }
+        }
+      }
+      
+      return scorecards
+    } catch (error) {
+      console.error('Error getting scorecards:', error)
+      // Fallback naar localStorage
+      const scorecards: any[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key?.startsWith(`scorecard_${matchId}_`)) {
+          try {
+            const scorecard = JSON.parse(localStorage.getItem(key)!)
+            scorecards.push(scorecard)
+          } catch (e) {
+            // Skip invalid entries
+          }
+        }
+      }
+      return scorecards
+    }
+  },
 }
 
 export { db, auth, app }

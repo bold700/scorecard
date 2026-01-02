@@ -2,6 +2,7 @@ import { Box, Typography, Card, CardContent, Stack } from '@mui/material'
 import { Match, Scorecard, TournamentPhase } from '../types'
 import { FighterAvatar } from './FighterAvatar'
 import { useNavigate } from 'react-router-dom'
+import { createAggregatedScorecard } from '../lib/scorecardAggregation'
 
 interface BracketVisualizationProps {
   matches: Match[]
@@ -25,12 +26,12 @@ export function BracketVisualization({ matches, matchScorecards, tournamentId }:
     return acc
   }, {} as Record<TournamentPhase, Match[]>)
 
-  // Get winner for a match
+  // Get winner for a match using aggregated scorecard
   const getMatchWinner = (match: Match): string | undefined => {
     const scorecards = matchScorecards[match.id] || []
-    const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
-    if (officialScorecard && officialScorecard.winner) {
-      return officialScorecard.winner === 'red' ? match.redFighter : match.blueFighter
+    const aggregatedScorecard = createAggregatedScorecard(match.id, scorecards) || scorecards[0]
+    if (aggregatedScorecard && aggregatedScorecard.winner) {
+      return aggregatedScorecard.winner === 'red' ? match.redFighter : match.blueFighter
     }
     return undefined
   }
@@ -105,8 +106,11 @@ export function BracketVisualization({ matches, matchScorecards, tournamentId }:
               </Typography>
               <Stack spacing={1.5} direction="row" sx={{ flexWrap: 'wrap', gap: 1.5 }}>
                 {bracket[phase].map(({ match, scorecard, winner }) => {
-                  const redScore = scorecard?.totalRed || 0
-                  const blueScore = scorecard?.totalBlue || 0
+                  // Use aggregated scorecard if available
+                  const scorecards = matchScorecards[match.id] || []
+                  const aggregatedScorecard = createAggregatedScorecard(match.id, scorecards) || scorecard
+                  const redScore = aggregatedScorecard?.totalRed || 0
+                  const blueScore = aggregatedScorecard?.totalBlue || 0
                   const isCompleted = !!winner
 
                   return (
