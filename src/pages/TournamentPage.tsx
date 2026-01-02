@@ -24,6 +24,7 @@ import { ExpandMore, ExpandLess, Delete } from '@mui/icons-material'
 import { Add } from '@mui/icons-material'
 import { Match, Scorecard, Fighter, TournamentType, TournamentPhase } from '../types'
 import { FighterAvatar } from '../components/FighterAvatar'
+import { BracketVisualization } from '../components/BracketVisualization'
 import { firebaseService } from '../lib/firebase'
 
 export function TournamentPage() {
@@ -49,6 +50,7 @@ export function TournamentPage() {
   })
   const [generateRounds, setGenerateRounds] = useState(3)
   const [tempFighterName, setTempFighterName] = useState('')
+  const [matchFilter, setMatchFilter] = useState<'all' | 'pending' | 'completed'>('all')
 
   useEffect(() => {
     const loadTournamentData = async () => {
@@ -579,7 +581,7 @@ export function TournamentPage() {
       </Box>
 
 
-      {/* Poule Standen */}
+      {/* Poule Standen voor poule-knockout */}
       {tournamentType === 'poule-knockout' && currentPhase === 'poule' && poules.length > 0 && (
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
@@ -604,9 +606,6 @@ export function TournamentPage() {
                               <Typography variant="body2" fontWeight={index < 2 ? 600 : 400}>
                                 {index + 1}. {standing.name}
                               </Typography>
-                              {index < 2 && (
-                                <Chip label="Q" color="success" size="small" sx={{ height: 18, fontSize: '0.65rem' }} />
-                              )}
                             </Box>
                             <Typography variant="body2" color="text.secondary">
                               {standing.wins}W - {standing.points}P
@@ -623,10 +622,44 @@ export function TournamentPage() {
         </Box>
       )}
 
+      {/* Bracket Visualization voor knockout fase */}
+      {(tournamentType === 'poule-knockout' || tournamentType === 'knockout') && currentPhase !== 'poule' && (
+        <BracketVisualization 
+          matches={matches}
+          matchScorecards={matchScorecards}
+          tournamentId={tournamentId!}
+        />
+      )}
+
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-          Wedstrijden {currentPhase !== 'poule' && `- ${getPhaseLabel(currentPhase)}`}
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">
+            Wedstrijden {currentPhase !== 'poule' && `- ${getPhaseLabel(currentPhase)}`}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Chip
+              label="Alle"
+              onClick={() => setMatchFilter('all')}
+              color={matchFilter === 'all' ? 'primary' : 'default'}
+              size="small"
+              sx={{ cursor: 'pointer' }}
+            />
+            <Chip
+              label="Nog te vechten"
+              onClick={() => setMatchFilter('pending')}
+              color={matchFilter === 'pending' ? 'primary' : 'default'}
+              size="small"
+              sx={{ cursor: 'pointer' }}
+            />
+            <Chip
+              label="Klaar"
+              onClick={() => setMatchFilter('completed')}
+              color={matchFilter === 'completed' ? 'primary' : 'default'}
+              size="small"
+              sx={{ cursor: 'pointer' }}
+            />
+          </Stack>
+        </Box>
         {matches.length === 0 ? (
           <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
             Nog geen wedstrijden. Maak er een aan!
@@ -634,7 +667,30 @@ export function TournamentPage() {
         ) : (
           <Stack spacing={2}>
               {matches
-                .filter(match => match.phase === currentPhase || !match.phase)
+                .filter(match => {
+                  // Filter by phase
+                  const phaseMatch = match.phase === currentPhase || !match.phase
+                  if (!phaseMatch) return false
+                  
+                  // Filter by status
+                  if (matchFilter === 'all') return true
+                  
+                  if (matchFilter === 'pending') {
+                    // Show matches without scores or with status pending
+                    const scorecards = matchScorecards[match.id] || []
+                    const displayScorecard = scorecards.find((s) => s.isOfficial) || scorecards[0]
+                    return !displayScorecard || displayScorecard.winner === null
+                  }
+                  
+                  if (matchFilter === 'completed') {
+                    // Show matches with completed scores
+                    const scorecards = matchScorecards[match.id] || []
+                    const displayScorecard = scorecards.find((s) => s.isOfficial) || scorecards[0]
+                    return displayScorecard && displayScorecard.winner !== null
+                  }
+                  
+                  return true
+                })
                 .map((match) => {
                 const scorecards = matchScorecards[match.id] || []
                 // Get the first official scorecard or first scorecard
