@@ -9,7 +9,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      // We keep this minimal to avoid missing asset 404s on GitHub Pages.
+      includeAssets: ['vite.svg'],
       manifest: {
         name: 'Scorecard - Vechtsport Score App',
         short_name: 'Scorecard',
@@ -20,14 +21,11 @@ export default defineConfig({
         orientation: 'portrait',
         icons: [
           {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
+            // Use an existing asset to prevent console errors about missing png icons.
+            // If you want proper PWA icons later, we can add real pngs to /public.
+            src: 'vite.svg',
+            sizes: 'any',
+            type: 'image/svg+xml'
           }
         ]
       },

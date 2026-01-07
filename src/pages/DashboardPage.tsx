@@ -77,10 +77,8 @@ export function DashboardPage() {
         }
         setMatchScorecards(scorecardsMap)
         
-        // Calculate insights after fighters are loaded
-        if (fightersData && fightersData.length > 0) {
-          calculateInsights(matchesData, scorecardsMap)
-        }
+        // Calculate insights (werkt ook als er nog geen fighters zijn opgeslagen)
+        calculateInsights(matchesData, scorecardsMap, fightersData || [])
       } else {
         // No matches yet
         setMatches([])
@@ -102,17 +100,17 @@ export function DashboardPage() {
   
   // Recalculate insights when fighters are loaded
   useEffect(() => {
-    if (matches.length > 0 && fighters.length > 0 && Object.keys(matchScorecards).length > 0) {
-      calculateInsights(matches, matchScorecards)
+    if (matches.length > 0 && Object.keys(matchScorecards).length > 0) {
+      calculateInsights(matches, matchScorecards, fighters)
     }
   }, [fighters, matches, matchScorecards])
 
-  const calculateInsights = (matchesData: Match[], scorecardsMap: Record<string, Scorecard[]>) => {
+  const calculateInsights = (matchesData: Match[], scorecardsMap: Record<string, Scorecard[]>, fightersData: Fighter[]) => {
     if (!matchesData || matchesData.length === 0) {
       setInsights({
         totalMatches: 0,
         completedMatches: 0,
-        totalFighters: fighters.length,
+        totalFighters: fightersData.length,
         totalRounds: 0,
         averageScore: 0,
         topFighters: [],
@@ -125,8 +123,8 @@ export function DashboardPage() {
     let totalScore = 0
     let totalRounds = 0
 
-    // Initialize stats for all fighters
-    fighters.forEach((fighter) => {
+    // Initialize stats for opgeslagen fighters (als die er zijn)
+    fightersData.forEach((fighter) => {
       statsMap.set(fighter.name, {
         name: fighter.name,
         wins: 0,
@@ -144,6 +142,32 @@ export function DashboardPage() {
       // Get aggregated scorecard for this match
       const scorecards = scorecardsMap[match.id] || []
       const officialScorecard = createAggregatedScorecard(match.id, scorecards) || scorecards[0]
+
+      // Zorg dat vechters altijd in statsMap bestaan, ook als ze niet als Fighter zijn opgeslagen
+      if (!statsMap.has(match.redFighter)) {
+        statsMap.set(match.redFighter, {
+          name: match.redFighter,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          totalPoints: 0,
+          matchesPlayed: 0,
+          averageScore: 0,
+          winPercentage: 0,
+        })
+      }
+      if (!statsMap.has(match.blueFighter)) {
+        statsMap.set(match.blueFighter, {
+          name: match.blueFighter,
+          wins: 0,
+          losses: 0,
+          draws: 0,
+          totalPoints: 0,
+          matchesPlayed: 0,
+          averageScore: 0,
+          winPercentage: 0,
+        })
+      }
 
       if (officialScorecard && officialScorecard.winner) {
         completedMatches.push({ match, scorecard: officialScorecard })
@@ -224,7 +248,7 @@ export function DashboardPage() {
     setInsights({
       totalMatches: matchesData.length,
       completedMatches: completedMatches.length,
-      totalFighters: fighters.length || statsMap.size,
+      totalFighters: statsMap.size,
       totalRounds,
       averageScore: Math.round(averageScore * 10) / 10,
       topFighters,
@@ -336,7 +360,7 @@ export function DashboardPage() {
           </Card>
 
           {/* Tussenstand */}
-          {fighters.length > 0 && (
+          {matches.length > 0 && (
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
@@ -344,16 +368,22 @@ export function DashboardPage() {
                 </Typography>
                 <Stack spacing={1}>
                   {(() => {
-                    // Calculate overall standings for all fighters
+                    // Calculate overall standings for all fighters (ook als er geen Fighter-records zijn)
                     const allStandings = new Map<string, { wins: number; points: number; matchesPlayed: number }>()
-                    
-                    fighters.forEach(fighter => {
-                      allStandings.set(fighter.name, { wins: 0, points: 0, matchesPlayed: 0 })
+                    const fighterNames = new Set<string>()
+                    fighters.forEach((f) => fighterNames.add(f.name))
+                    matches.forEach((m) => {
+                      fighterNames.add(m.redFighter)
+                      fighterNames.add(m.blueFighter)
+                    })
+                    fighterNames.forEach((name) => {
+                      allStandings.set(name, { wins: 0, points: 0, matchesPlayed: 0 })
                     })
 
                     matches.forEach(match => {
                       const scorecards = matchScorecards[match.id] || []
-                      const officialScorecard = scorecards.find(s => s.isOfficial) || scorecards[0]
+                      const aggregatedScorecard = createAggregatedScorecard(match.id, scorecards)
+                      const officialScorecard = aggregatedScorecard || scorecards.find(s => s.isOfficial) || scorecards[0]
                       
                       // Include matches with scores, even if not completed yet
                       if (officialScorecard) {

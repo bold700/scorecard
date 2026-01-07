@@ -262,11 +262,14 @@ export function TournamentPage() {
 
   const handleCreateManualMatch = async () => {
     if (!manualMatch.redFighter || !manualMatch.blueFighter || manualMatch.redFighter === manualMatch.blueFighter) return
+    const redName = manualMatch.redFighter.trim()
+    const blueName = manualMatch.blueFighter.trim()
+    if (!redName || !blueName || redName === blueName) return
 
     // Check if match already exists
     const matchExists = matches.some(m => 
-      (m.redFighter === manualMatch.redFighter && m.blueFighter === manualMatch.blueFighter) ||
-      (m.redFighter === manualMatch.blueFighter && m.blueFighter === manualMatch.redFighter)
+      (m.redFighter === redName && m.blueFighter === blueName) ||
+      (m.redFighter === blueName && m.blueFighter === redName)
     )
 
     if (matchExists) {
@@ -274,11 +277,38 @@ export function TournamentPage() {
       return
     }
 
+    // Zorg dat beide vechters ook echt bestaan in de fighters-lijst (belangrijk voor Insights/standings)
+    const ensureFighter = (name: string): Fighter | null => {
+      const existing = fighters.find((f) => f.name.toLowerCase() === name.toLowerCase())
+      if (existing) return existing
+      return {
+        id: `fighter_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        name,
+        tournamentId: tournamentId!,
+      }
+    }
+
+    const redF = ensureFighter(redName)
+    const blueF = ensureFighter(blueName)
+    const newFighters: Fighter[] = []
+    if (redF && !fighters.some((f) => f.id === redF.id)) newFighters.push(redF)
+    if (blueF && !fighters.some((f) => f.id === blueF.id)) newFighters.push(blueF)
+    if (newFighters.length > 0) {
+      const updatedFighters = [...fighters, ...newFighters]
+      setFighters(updatedFighters)
+      await firebaseService.saveFighters(tournamentId!, updatedFighters)
+      const tournament = await firebaseService.getTournament(tournamentId!)
+      if (tournament) {
+        tournament.fighters = updatedFighters.map((f) => f.id)
+        await firebaseService.saveTournament(tournament)
+      }
+    }
+
     const match: Match = {
       id: `match_${Date.now()}`,
       tournamentId: tournamentId!,
-      redFighter: manualMatch.redFighter,
-      blueFighter: manualMatch.blueFighter,
+      redFighter: redName,
+      blueFighter: blueName,
       weightClass: '',
       rounds: manualMatch.rounds,
       officialJudges: [],

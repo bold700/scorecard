@@ -72,6 +72,9 @@ export interface Scorecard {
   matchId: string
   userId: string
   isOfficial: boolean
+  judgeName?: string
+  createdAt?: number
+  updatedAt?: number
   rounds: RoundScore[]
   totalRed: number
   totalBlue: number

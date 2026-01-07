@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Container,
@@ -15,6 +15,7 @@ import {
   ListItemText,
   IconButton,
   Divider,
+  Alert,
 } from '@mui/material'
 import { CheckCircle, ArrowBack, ArrowForward, Delete } from '@mui/icons-material'
 import { Scorecard, ScoreEvent, Match, RoundScore } from '../types'
@@ -34,6 +35,7 @@ export function ScorecardPage() {
   const [scorecard, setScorecard] = useState<Scorecard | null>(null)
   const [currentRound, setCurrentRound] = useState(1)
   const [completedRounds, setCompletedRounds] = useState<number[]>([])
+  const isOwnScorecard = useMemo(() => Boolean(user?.id && userId && user.id === userId), [user?.id, userId])
 
   useEffect(() => {
     const loadMatch = async () => {
@@ -60,6 +62,9 @@ export function ScorecardPage() {
             matchId: matchId!,
             userId: userId!,
             isOfficial: false, // Users zijn geen official judges, alleen hun eigen scores
+            judgeName: user?.name || undefined,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
             rounds: Array.from({ length: foundMatch.rounds }, (_, i) => ({
               round: i + 1,
               redPoints: 0,
@@ -85,6 +90,7 @@ export function ScorecardPage() {
 
   const handleScoreEvent = async (corner: 'red' | 'blue', type: 'point' | 'deduction', value: number) => {
     if (!scorecard || !match) return
+    if (!isOwnScorecard) return
 
     const event: ScoreEvent = {
       id: `event_${Date.now()}`,
@@ -101,10 +107,12 @@ export function ScorecardPage() {
     const updatedRounds = calculateRounds(updatedEvents, match.rounds)
     const updatedScorecard: Scorecard = {
       ...scorecard,
+      judgeName: scorecard.judgeName || user?.name || undefined,
       events: updatedEvents,
       rounds: updatedRounds,
       totalRed: updatedRounds.reduce((sum, r) => sum + r.redTotal, 0),
       totalBlue: updatedRounds.reduce((sum, r) => sum + r.blueTotal, 0),
+      updatedAt: Date.now(),
       winner:
         updatedRounds.reduce((sum, r) => sum + r.redTotal, 0) >
         updatedRounds.reduce((sum, r) => sum + r.blueTotal, 0)
@@ -183,15 +191,18 @@ export function ScorecardPage() {
 
   const handleDeleteEvent = async (eventId: string) => {
     if (!scorecard || !match) return
+    if (!isOwnScorecard) return
 
     const updatedEvents = scorecard.events.filter((e) => e.id !== eventId)
     const updatedRounds = calculateRounds(updatedEvents, match.rounds)
     const updatedScorecard: Scorecard = {
       ...scorecard,
+      judgeName: scorecard.judgeName || user?.name || undefined,
       events: updatedEvents,
       rounds: updatedRounds,
       totalRed: updatedRounds.reduce((sum, r) => sum + r.redTotal, 0),
       totalBlue: updatedRounds.reduce((sum, r) => sum + r.blueTotal, 0),
+      updatedAt: Date.now(),
       winner:
         updatedRounds.reduce((sum, r) => sum + r.redTotal, 0) >
         updatedRounds.reduce((sum, r) => sum + r.blueTotal, 0)
@@ -221,6 +232,31 @@ export function ScorecardPage() {
 
   return (
     <Container maxWidth="sm" sx={{ py: 2, pb: 4, px: 0 }}>
+      {!isOwnScorecard && user?.id && (
+        <Box sx={{ px: 2, mb: 2 }}>
+          <Alert
+            severity="info"
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => navigate(`/tournament/${tournamentId}/match/${matchId}/scorecard/${user.id}`)}
+              >
+                Open mijn scorecard
+              </Button>
+            }
+          >
+            Je bekijkt de scorecard van iemand anders. Deze pagina is nu <strong>alleen-lezen</strong>.
+          </Alert>
+        </Box>
+      )}
+
+      <Box sx={{ px: 2, mb: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          Jury: <strong>{scorecard.judgeName || user?.name || 'Onbekend'}</strong>
+        </Typography>
+      </Box>
+
       {/* Round Stepper */}
       <Box sx={{ px: 2, mb: 3 }}>
         <Stepper activeStep={currentRound - 1} alternativeLabel>
@@ -290,6 +326,7 @@ export function ScorecardPage() {
                   // Save completed rounds
                   localStorage.setItem(`completed_rounds_${matchId}_${userId}`, JSON.stringify(updatedCompleted))
                 }}
+                disabled={!isOwnScorecard}
                 size="large"
               >
                 Ronde {currentRound + 1}
@@ -318,6 +355,7 @@ export function ScorecardPage() {
                   // Navigate back to tournament overview
                   navigate(`/tournament/${tournamentId}`)
                 }}
+                disabled={!isOwnScorecard}
                 size="large"
               >
                 Beëindigen
@@ -428,6 +466,7 @@ export function ScorecardPage() {
                     size="large"
                     fullWidth
                     onClick={() => handleScoreEvent('red', 'point', 1)}
+                    disabled={!isOwnScorecard}
                     sx={{
                       minHeight: '56px',
                       fontSize: '1rem',
@@ -442,6 +481,7 @@ export function ScorecardPage() {
                     size="large"
                     fullWidth
                     onClick={() => handleScoreEvent('red', 'deduction', -1)}
+                    disabled={!isOwnScorecard}
                     sx={{
                       minHeight: '56px',
                       fontSize: '1rem',
@@ -466,6 +506,7 @@ export function ScorecardPage() {
                               onClick={() => handleDeleteEvent(event.id)}
                               color="error"
                               size="small"
+                              disabled={!isOwnScorecard}
                             >
                               <Delete fontSize="small" />
                             </IconButton>
@@ -508,6 +549,7 @@ export function ScorecardPage() {
                     size="large"
                     fullWidth
                     onClick={() => handleScoreEvent('blue', 'point', 1)}
+                    disabled={!isOwnScorecard}
                     sx={{
                       minHeight: '56px',
                       fontSize: '1rem',
@@ -522,6 +564,7 @@ export function ScorecardPage() {
                     size="large"
                     fullWidth
                     onClick={() => handleScoreEvent('blue', 'deduction', -1)}
+                    disabled={!isOwnScorecard}
                     sx={{
                       minHeight: '56px',
                       fontSize: '1rem',
@@ -546,6 +589,7 @@ export function ScorecardPage() {
                               onClick={() => handleDeleteEvent(event.id)}
                               color="info"
                               size="small"
+                              disabled={!isOwnScorecard}
                             >
                               <Delete fontSize="small" />
                             </IconButton>
