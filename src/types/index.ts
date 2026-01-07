@@ -73,6 +73,7 @@ export interface Scorecard {
   userId: string
   isOfficial: boolean
   judgeName?: string
+  ownerUid?: string
   createdAt?: number
   updatedAt?: number
   rounds: RoundScore[]

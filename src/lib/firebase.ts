@@ -337,6 +337,12 @@ export const firebaseService = {
     const cleanedScorecard = Object.fromEntries(
       Object.entries(scorecard).filter(([, value]) => value !== undefined)
     )
+    // Bind ownership to Firebase Auth uid (anonymous auth). This allows Firestore rules to prevent others from editing.
+    if (auth?.currentUser?.uid && !cleanedScorecard.ownerUid) {
+      cleanedScorecard.ownerUid = auth.currentUser.uid
+    }
+    cleanedScorecard.updatedAt = Date.now()
+    if (!cleanedScorecard.createdAt) cleanedScorecard.createdAt = Date.now()
     
     if (!isFirebaseAvailable()) {
       localStorage.setItem(`scorecard_${scorecard.matchId}_${scorecard.userId}`, JSON.stringify(scorecard))

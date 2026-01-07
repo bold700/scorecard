@@ -21,7 +21,7 @@ import { CheckCircle, ArrowBack, ArrowForward, Delete } from '@mui/icons-materia
 import { Scorecard, ScoreEvent, Match, RoundScore } from '../types'
 import { useAuthStore } from '../store/useAuthStore'
 import { FighterAvatar } from '../components/FighterAvatar'
-import { firebaseService } from '../lib/firebase'
+import { firebaseService, auth } from '../lib/firebase'
 
 export function ScorecardPage() {
   const { tournamentId, matchId, userId } = useParams<{
@@ -35,7 +35,14 @@ export function ScorecardPage() {
   const [scorecard, setScorecard] = useState<Scorecard | null>(null)
   const [currentRound, setCurrentRound] = useState(1)
   const [completedRounds, setCompletedRounds] = useState<number[]>([])
-  const isOwnScorecard = useMemo(() => Boolean(user?.id && userId && user.id === userId), [user?.id, userId])
+  const currentAuthUid = auth?.currentUser?.uid
+  const isOwnByRoute = useMemo(() => Boolean(user?.id && userId && user.id === userId), [user?.id, userId])
+  const isOwnByOwnerUid = useMemo(() => {
+    if (!scorecard?.ownerUid) return true // legacy/no owner set yet
+    if (!currentAuthUid) return false
+    return scorecard.ownerUid === currentAuthUid
+  }, [scorecard?.ownerUid, currentAuthUid])
+  const isOwnScorecard = isOwnByRoute && isOwnByOwnerUid
 
   useEffect(() => {
     const loadMatch = async () => {
@@ -50,6 +57,12 @@ export function ScorecardPage() {
         // Load or create scorecard for THIS user only
         const loadedScorecard = await firebaseService.getScorecard(matchId!, userId!)
         if (loadedScorecard) {
+          // If this is your scorecard and it has no ownerUid yet, we can attach it (migratie)
+          if (user?.id === userId && currentAuthUid && !loadedScorecard.ownerUid) {
+            loadedScorecard.ownerUid = currentAuthUid
+            loadedScorecard.updatedAt = Date.now()
+            await firebaseService.saveScorecard(loadedScorecard)
+          }
           setScorecard(loadedScorecard)
           // Load completed rounds
           const completed = loadedScorecard.rounds
@@ -63,6 +76,7 @@ export function ScorecardPage() {
             userId: userId!,
             isOfficial: false, // Users zijn geen official judges, alleen hun eigen scores
             judgeName: user?.name || undefined,
+            ownerUid: currentAuthUid || undefined,
             createdAt: Date.now(),
             updatedAt: Date.now(),
             rounds: Array.from({ length: foundMatch.rounds }, (_, i) => ({
@@ -86,7 +100,7 @@ export function ScorecardPage() {
     }
     
     loadMatch()
-  }, [tournamentId, matchId, userId, user])
+  }, [tournamentId, matchId, userId, user, currentAuthUid])
 
   const handleScoreEvent = async (corner: 'red' | 'blue', type: 'point' | 'deduction', value: number) => {
     if (!scorecard || !match) return

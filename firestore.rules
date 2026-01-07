@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Let op: onderstaande rules zijn een STARTPUNT.
+    // Voor scorecards willen we afdwingen: alleen de eigenaar (request.auth.uid) mag wijzigen/verwijderen.
+    match /scorecards/{scorecardId} {
+      allow read: if true;
+
+      // Create: ownerUid moet gelijk zijn aan de ingelogde (anonieme) uid
+      allow create: if request.auth != null
+                    && request.resource.data.ownerUid == request.auth.uid;
+
+      // Update/Delete: alleen eigenaar van het bestaande document
+      allow update, delete: if request.auth != null
+                            && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // Overige collections (tournaments/matches/fighters) staan momenteel open in de app.
+    // Als je dit ook wilt beveiligen (organizer-only), maken we aparte rollen + rules.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+
