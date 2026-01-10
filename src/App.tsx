@@ -37,7 +37,11 @@ function App() {
           {firebaseStatus.lastError?.message ? firebaseStatus.lastError.message : ''}
         </Alert>
       </Collapse>
-      <Box component="main" sx={{ flexGrow: 1, pb: 7 }}>
+      {/*
+        Space for the fixed BottomNavigation.
+        We measure the actual height and store it in --app-bottom-nav-height.
+      */}
+      <Box component="main" sx={{ flexGrow: 1, pb: 'calc(var(--app-bottom-nav-height, 56px) + 16px)' }}>
         <Routes>
           <Route path="/" element={<HomePage createDialogOpen={createDialogOpen} setCreateDialogOpen={setCreateDialogOpen} />} />
           <Route path="/insights" element={<InsightsSelectionPage />} />

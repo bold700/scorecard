@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Container,
@@ -19,6 +19,8 @@ import {
   Collapse,
   Fab,
   Menu,
+  IconButton,
+  Tooltip,
 } from '@mui/material'
 import { ExpandMore, ExpandLess, Delete } from '@mui/icons-material'
 import { Add } from '@mui/icons-material'
@@ -52,6 +54,9 @@ export function TournamentPage() {
   const [generateRounds, setGenerateRounds] = useState(3)
   const [tempFighterName, setTempFighterName] = useState('')
   const [matchFilter, setMatchFilter] = useState<'all' | 'pending' | 'completed'>('all')
+  const [matchToDelete, setMatchToDelete] = useState<Match | null>(null)
+  const [openDeleteMatchDialog, setOpenDeleteMatchDialog] = useState(false)
+  const autoAdvanceInFlightRef = useRef(false)
 
   useEffect(() => {
     const loadTournamentData = async () => {
@@ -100,6 +105,44 @@ export function TournamentPage() {
     loadTournamentData()
   }, [tournamentId])
 
+  // Light polling so this page can react to score updates from other devices (without a subscription per match)
+  useEffect(() => {
+    if (!tournamentId) return
+    if (currentPhase === 'poule') return
+
+    // Keep currentPhase aligned to the first existing knockout phase (helps for tournaments created before currentPhase was persisted)
+    if (tournamentType === 'knockout') {
+      const hasQf = matches.some((m) => m.phase === 'kwartfinale')
+      const hasHf = matches.some((m) => m.phase === 'halve_finale')
+      const hasF = matches.some((m) => m.phase === 'finale')
+      if (!hasQf && hasHf && currentPhase === 'kwartfinale') setCurrentPhase('halve_finale')
+      if (!hasQf && !hasHf && hasF && currentPhase !== 'finale') setCurrentPhase('finale')
+    }
+
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const phaseMatches = matches.filter((m) => (m.phase || 'poule') === currentPhase)
+        if (phaseMatches.length === 0) return
+        const updates: Record<string, Scorecard[]> = {}
+        for (const m of phaseMatches) {
+          updates[m.id] = (await firebaseService.getAllScorecardsForMatch(m.id)) as Scorecard[]
+        }
+        if (cancelled) return
+        setMatchScorecards((prev) => ({ ...prev, ...updates }))
+      } catch {
+        // ignore polling failures
+      }
+    }
+
+    poll()
+    const id = window.setInterval(poll, 3000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [tournamentId, currentPhase, matches, tournamentType])
+
   const handleDeleteFighter = async (fighterId: string) => {
     const updatedFighters = fighters.filter(f => f.id !== fighterId)
     setFighters(updatedFighters)
@@ -120,6 +163,69 @@ export function TournamentPage() {
     )
     setMatches(updatedMatches)
     await firebaseService.saveMatches(tournamentId!, updatedMatches)
+
+    // Keep tournament.matches consistent
+    const tournament2 = await firebaseService.getTournament(tournamentId!)
+    if (tournament2) {
+      tournament2.matches = updatedMatches.map((m) => m.id)
+      await firebaseService.saveTournament(tournament2)
+    }
+
+    // Cleanup local UI state
+    setMatchScorecards((prev) => {
+      const next = { ...prev }
+      for (const m of matches) {
+        if (m.redFighter === deletedFighter?.name || m.blueFighter === deletedFighter?.name) {
+          delete next[m.id]
+        }
+      }
+      return next
+    })
+    setExpandedMatches((prev) => {
+      const next = { ...prev }
+      for (const m of matches) {
+        if (m.redFighter === deletedFighter?.name || m.blueFighter === deletedFighter?.name) {
+          delete next[m.id]
+        }
+      }
+      return next
+    })
+  }
+
+  const requestDeleteMatch = (match: Match) => {
+    setMatchToDelete(match)
+    setOpenDeleteMatchDialog(true)
+  }
+
+  const handleConfirmDeleteMatch = async () => {
+    if (!matchToDelete) return
+    const matchId = matchToDelete.id
+
+    const updatedMatches = matches.filter((m) => m.id !== matchId)
+    setMatches(updatedMatches)
+    await firebaseService.saveMatches(tournamentId!, updatedMatches)
+
+    // Update tournament.matches
+    const tournament = await firebaseService.getTournament(tournamentId!)
+    if (tournament) {
+      tournament.matches = updatedMatches.map((m) => m.id)
+      await firebaseService.saveTournament(tournament)
+    }
+
+    // Cleanup local UI state
+    setMatchScorecards((prev) => {
+      const next = { ...prev }
+      delete next[matchId]
+      return next
+    })
+    setExpandedMatches((prev) => {
+      const next = { ...prev }
+      delete next[matchId]
+      return next
+    })
+
+    setOpenDeleteMatchDialog(false)
+    setMatchToDelete(null)
   }
 
   const handleAddTempFighter = async () => {
@@ -392,9 +498,10 @@ export function TournamentPage() {
   }
 
   const advanceToNextPhase = async () => {
-    if (tournamentType !== 'poule-knockout') return
+    if (tournamentType !== 'poule-knockout' && tournamentType !== 'knockout') return
 
     if (currentPhase === 'poule') {
+      if (tournamentType !== 'poule-knockout') return
       // Bereken poule winnaars
       const qualifiers: string[] = []
       
@@ -410,6 +517,16 @@ export function TournamentPage() {
 
       // Genereer kwartfinales
       const nextPhase: TournamentPhase = qualifiers.length <= 4 ? 'halve_finale' : 'kwartfinale'
+      // Idempotent: als de volgende fase al bestaat, alleen currentPhase updaten
+      if (matches.some((m) => m.phase === nextPhase)) {
+        setCurrentPhase(nextPhase)
+        const tournament = await firebaseService.getTournament(tournamentId!)
+        if (tournament && tournament.currentPhase !== nextPhase) {
+          tournament.currentPhase = nextPhase
+          await firebaseService.saveTournament(tournament)
+        }
+        return
+      }
       const bracketMatches = generateKnockoutBracket(qualifiers)
       bracketMatches.forEach(m => {
         m.phase = nextPhase
@@ -429,6 +546,16 @@ export function TournamentPage() {
       
       await firebaseService.saveMatches(tournamentId!, updatedMatches)
     } else if (currentPhase === 'kwartfinale') {
+      // Idempotent: als halve finales al bestaan, alleen currentPhase updaten
+      if (matches.some((m) => m.phase === 'halve_finale')) {
+        setCurrentPhase('halve_finale')
+        const tournament = await firebaseService.getTournament(tournamentId!)
+        if (tournament && tournament.currentPhase !== 'halve_finale') {
+          tournament.currentPhase = 'halve_finale'
+          await firebaseService.saveTournament(tournament)
+        }
+        return
+      }
       // Winnaars van kwartfinales gaan door naar halve finales
       const quarterFinalMatches = matches.filter(m => m.phase === 'kwartfinale')
       const winners: string[] = []
@@ -461,6 +588,16 @@ export function TournamentPage() {
         await firebaseService.saveMatches(tournamentId!, updatedMatches)
       }
     } else if (currentPhase === 'halve_finale') {
+      // Idempotent: als finale al bestaat, alleen currentPhase updaten
+      if (matches.some((m) => m.phase === 'finale')) {
+        setCurrentPhase('finale')
+        const tournament = await firebaseService.getTournament(tournamentId!)
+        if (tournament && tournament.currentPhase !== 'finale') {
+          tournament.currentPhase = 'finale'
+          await firebaseService.saveTournament(tournament)
+        }
+        return
+      }
       // Winnaars en verliezers van halve finales
       const semiFinalMatches = matches.filter(m => m.phase === 'halve_finale')
       const winners: string[] = []
@@ -478,7 +615,7 @@ export function TournamentPage() {
       if (winners.length === 2 && losers.length === 2) {
         // Finale
         const finalMatch: Match = {
-          id: `match_${Date.now()}_final`,
+          id: `match_${tournamentId!}_finale_1`,
           tournamentId: tournamentId!,
           redFighter: winners[0],
           blueFighter: winners[1],
@@ -493,7 +630,7 @@ export function TournamentPage() {
 
         // Bronzen finale
         const bronzeMatch: Match = {
-          id: `match_${Date.now()}_bronze`,
+          id: `match_${tournamentId!}_bronzen_finale_1`,
           tournamentId: tournamentId!,
           redFighter: losers[0],
           blueFighter: losers[1],
@@ -541,7 +678,8 @@ export function TournamentPage() {
     for (let i = 0; i < currentFighters.length; i += 2) {
       if (i + 1 < currentFighters.length) {
         const match: Match = {
-          id: `match_${Date.now()}_${bracketPosition}`,
+          // Deterministisch zodat meerdere clients niet verschillende match IDs genereren
+          id: `match_${tournamentId!}_${phase}_${bracketPosition}`,
           tournamentId: tournamentId!,
           redFighter: currentFighters[i],
           blueFighter: currentFighters[i + 1],
@@ -560,6 +698,34 @@ export function TournamentPage() {
     
     return bracketMatches
   }
+
+  // Auto-advance knockout rounds when a phase is complete (no manual click needed)
+  const canAutoAdvance = useMemo(() => {
+    if (tournamentType !== 'poule-knockout' && tournamentType !== 'knockout') return false
+
+    if (currentPhase === 'kwartfinale') {
+      return checkPhaseComplete('kwartfinale') && !matches.some((m) => m.phase === 'halve_finale')
+    }
+    if (currentPhase === 'halve_finale') {
+      return checkPhaseComplete('halve_finale') && !matches.some((m) => m.phase === 'finale')
+    }
+    return false
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournamentType, currentPhase, matches, matchScorecards])
+
+  useEffect(() => {
+    if (!canAutoAdvance) return
+    if (autoAdvanceInFlightRef.current) return
+    autoAdvanceInFlightRef.current = true
+    ;(async () => {
+      try {
+        await advanceToNextPhase()
+      } finally {
+        autoAdvanceInFlightRef.current = false
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canAutoAdvance])
 
   return (
     <Container maxWidth="md" sx={{ py: 4, pb: 10 }}>
@@ -727,6 +893,7 @@ export function TournamentPage() {
                     key={match.id} 
                     variant="outlined"
                     sx={{
+                      position: 'relative',
                       cursor: 'pointer',
                       '&:hover': {
                         bgcolor: 'action.hover',
@@ -742,6 +909,20 @@ export function TournamentPage() {
                       }
                     }}
                   >
+                    <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}>
+                      <Tooltip title="Wedstrijd verwijderen">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            requestDeleteMatch(match)
+                          }}
+                          aria-label="wedstrijd verwijderen"
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                     <CardContent>
                       {/* Score Display or Status */}
                       {hasScores ? (
@@ -1123,6 +1304,47 @@ export function TournamentPage() {
           </Stack>
         )}
       </Box>
+
+      {/* Verwijder wedstrijd dialog */}
+      <Dialog
+        open={openDeleteMatchDialog}
+        onClose={() => {
+          setOpenDeleteMatchDialog(false)
+          setMatchToDelete(null)
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Wedstrijd verwijderen</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Weet je zeker dat je deze wedstrijd wilt verwijderen?
+          </Typography>
+          {matchToDelete && (
+            <Typography variant="body1" sx={{ mt: 2, fontWeight: 600 }}>
+              {matchToDelete.redFighter} vs {matchToDelete.blueFighter}
+            </Typography>
+          )}
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+            Let op: bestaande scorecards (als die al zijn ingevuld) blijven in Firebase staan, maar worden niet meer gebruikt in het toernooi
+            zodra de wedstrijd weg is.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            onClick={() => {
+              setOpenDeleteMatchDialog(false)
+              setMatchToDelete(null)
+            }}
+            fullWidth
+          >
+            Annuleren
+          </Button>
+          <Button onClick={handleConfirmDeleteMatch} color="error" variant="contained" fullWidth>
+            Verwijderen
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Handmatig Wedstrijd Dialog */}
       <Dialog open={openMatchDialog} onClose={() => setOpenMatchDialog(false)} maxWidth="sm" fullWidth>
